@@ -1,5 +1,5 @@
 
-#include "tokenstream.h"
+#include <parser/tokenstream.h>
 
 TokenStream::TokenStream(Lexer *lexer) :
 	lex(lexer),

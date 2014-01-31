@@ -1,5 +1,5 @@
 
-#include "reader.h"
+#include <lexer/reader.h>
 
 Reader::Reader(std::istream *in) :
 	in(in),

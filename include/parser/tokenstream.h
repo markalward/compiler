@@ -6,7 +6,8 @@
 #include <exception>
 #include <vector>
 #include <memory>
-#include "../lexer/token.h"
+#include <lexer/lexer.h>
+#include <lexer/token.h>
 
 using namespace std;
 
@@ -15,16 +16,6 @@ class ParseException : public exception
 public:
 	
 };
-
-// temp (already defined in lexer.h)
-class Lexer
-{
-protected:
-
-public:
-	virtual Token *getToken() = 0;
-};
-
 
 typedef pair<TokenName, TokenName> TokenPair;
 

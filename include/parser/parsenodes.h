@@ -2,10 +2,9 @@
 #ifndef PARSENODES_H
 #define PARSENODES_H
 
-#include "../lexer/token.h"
-#include "tokenstream.h"
-
-#include "basenodes.h"
+#include <lexer/token.h>
+#include <parser/tokenstream.h>
+#include <parser/basenodes.h>
 
 class BinOp;
 class UnOp;
@@ -124,6 +123,7 @@ public:
 	vector< unique_ptr<VarDec> > list;
 
 	static unique_ptr<VarList> parse(TokenStream &in);
+	string toString();
 };
 
 class VarDec : public ParseNode
@@ -133,6 +133,7 @@ public:
 	unique_ptr<Token> type;
 
 	static unique_ptr<VarDec> parse(TokenStream &in);
+	string toString();
 };
 
 

@@ -1,8 +1,8 @@
 
 #include <locale>
-#include "lexer.h"
-#include "token.h"
-#include "reader.h"
+#include <lexer/lexer.h>
+#include <lexer/token.h>
+#include <lexer/reader.h>
 
 using namespace std;
 
@@ -15,7 +15,6 @@ Token *IBTLLexer::makeIdToken()
 {
 	const char *lexeme = input.getLexeme();
 	TokenName keyword;
-
 	if(keywordTable.isKeyword(lexeme, keyword)) {
 		Token *ret = new Token(keyword);
 		return ret;
@@ -54,7 +53,7 @@ Token *IBTLLexer::readId()
 
 	while(true) {
 		c = input.getChar();
-		if(std::isalnum(c)) continue;
+		if(std::isalnum(c) || c == '_') continue;
 		else break;
 	}
 
@@ -180,6 +179,12 @@ Token *IBTLLexer::readOp(char c)
 	case '%': return makeOpToken(TK_MOD); break;
 	case '[': return makeOpToken(TK_OBRAK); break;
 	case ']': return makeOpToken(TK_CBRAK); break;
+	case ':':
+		c = input.getChar();
+		if(c == '=') return makeOpToken(TK_ASSIGN);
+		else
+			throw std::exception();
+		break;
 	case '!':
 	case '<':
 	case '>':
@@ -191,22 +196,29 @@ Token *IBTLLexer::readOp(char c)
 	}
 }
 
+void IBTLLexer::readWs()
+{
+	char c = input.getChar();
+	while(std::isspace(c) && c != 0)
+		c = input.getChar();
+	input.putChar();
+	input.clearLexeme();
+}
+
 Token *IBTLLexer::getToken()
 {
 	char c;
-	c = input.getChar();
 	Token *ret;
 
 	// first consume any leading ws
-	while(std::isspace(c) && c != 0)
-		c = input.getChar();
-	input.clearLexeme();
+	readWs();
 
+	c = input.getChar();
 	if(c == 0)
-		return NULL;
+		ret = new Token(TK_EOF);
 	else if(c == '\"')
 		ret = readString();
-	else if(std::isalpha(c))
+	else if(std::isalpha(c) || c == '_')
 		ret = readId();
 	else if(std::isdigit(c))
 		ret = readNumber();

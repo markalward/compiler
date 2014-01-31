@@ -2,8 +2,8 @@
 #include <iostream>
 #include <memory>
 #include <sstream>
-#include "tokenstream.h"
-#include "parsenodes.h"
+#include <parser/tokenstream.h>
+#include <parser/parsenodes.h>
 
 using namespace std;
 
@@ -11,7 +11,7 @@ struct TypePred : public TokenPredicate
 {
 	bool operator() (TokenName n) const
 	{
-		return n == TK_KBOOL;
+		return n & TK_TYPENAME;
 	}
 } isType;
 
@@ -19,7 +19,7 @@ struct UnopPred : public TokenPredicate
 {
 	bool operator() (TokenName n) const
 	{
-		return n == TK_MINUS;
+		return n & TK_UNOP;
 	}
 } isUnop;
 
@@ -27,7 +27,7 @@ struct BinopPred : public TokenPredicate
 {
 	bool operator() (TokenName n) const
 	{
-		return n == TK_PLUS || n == TK_MULT;
+		return n & TK_BINOP;
 	}
 } isBinop;
 
@@ -35,7 +35,7 @@ struct AmbigPred : public TokenPredicate
 {
 	bool operator() (TokenName n) const
 	{
-		return n == TK_MINUS;
+		return (n & TK_BINOP) && (n & TK_UNOP);
 	}
 } isAmbiguousOp;
 
@@ -43,8 +43,7 @@ struct ConstPred : public TokenPredicate
 {
 	bool operator() (TokenName n) const
 	{
-		return n == TK_INT || n == TK_STR || n == TK_T ||
-			n == TK_F || n == TK_REAL;
+		return n & TK_CONST;
 	}
 } isConstant;
 
@@ -52,8 +51,7 @@ struct StmtPred : public TokenPredicate
 {
 	bool operator() (TokenName n) const
 	{
-		return n == TK_WHILE || n == TK_IF ||
-		       n == TK_LET || n == TK_PRINT;
+		return n & TK_STATEMENT;
 	}
 } isStatement;
 
@@ -357,6 +355,16 @@ unique_ptr<VarList> VarList::parse(TokenStream &in)
 	return obj;
 }
 
+string VarList::toString()
+{
+	ostringstream str;
+	str << "[VarList ";
+	for(auto iter = list.begin(); iter != list.end(); iter++)
+		str << (*iter)->toString() << " ";
+	str << "]";
+	return str.str();
+}
+
 unique_ptr<VarDec> VarDec::parse(TokenStream &in)
 {
 	unique_ptr<VarDec> obj(new VarDec);
@@ -366,6 +374,14 @@ unique_ptr<VarDec> VarDec::parse(TokenStream &in)
 	in.discard(TK_CBRAK);
 	return obj;
 }
+
+string VarDec::toString()
+{
+	ostringstream str;
+	str << "[VarDec " << name->toString() << " " << type->toString() << "]";
+	return str.str();
+}
+
 
 
 

@@ -2,6 +2,10 @@
 #ifndef BASENODES_H
 #define BASENODES_H
 
+#include <vector>
+#include <memory>
+#include <string>
+
 class TokenStream;
 
 using namespace std;

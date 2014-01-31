@@ -7,21 +7,16 @@
 
 class Lexer
 {
-protected:
-	Reader &input;
-
 public:
-	Lexer(Reader &input) :
-		input(input)
-	{}
 
 	virtual Token *getToken() = 0;
 };
 
 
-class IBTLLexer : Lexer
+class IBTLLexer : public Lexer
 {
 private:
+	Reader &input;
 	KeywordTable keywordTable;
 
 public:
@@ -34,10 +29,13 @@ public:
 	Token *readNumber();
 	Token *readRelop(char c);
 	Token *readOp(char c);
+	void readWs();
 
 public:
 	IBTLLexer(Reader &input) :
-		Lexer(input)
+		Lexer(),
+		input(input),
+		keywordTable()
 	{}
 
 	Token *getToken();
