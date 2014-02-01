@@ -18,6 +18,7 @@ private:
 	char readbuf[BUFSIZE];
 	int pos;
 	int line;
+	int startline;
 	
 public:
 	Reader(std::istream *in);
@@ -31,6 +32,7 @@ public:
 	void clearLexeme();
 
 	int getLine() {return line; }
+	int getStartLine() {return startline; }
 };
 
 #endif

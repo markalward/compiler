@@ -8,7 +8,8 @@ Reader::Reader(std::istream *in) :
 	quotemode(false),
 	readbuf(),
 	pos(0),
-	line(1)
+	line(1),
+	startline(line)
 {}
 
 char Reader::getChar()
@@ -22,9 +23,9 @@ char Reader::getChar()
 	else {
 		in->get(c);
 		if(in->eof()) c = 0;
-		if(c == '\n') line++;
 	}
 		
+	if(c == '\n') line++;
 	readbuf[pos++] = c;
 	return c;
 }
@@ -35,6 +36,7 @@ void Reader::putChar()
 		throw std::exception();
 	charbuf = readbuf[pos-1];
 	charbuf_full = true;
+	if(charbuf == '\n') line--;
 	pos--;
 }
 
@@ -47,5 +49,6 @@ const char *Reader::getLexeme()
 
 void Reader::clearLexeme()
 {
+	startline = line;
 	pos = 0;
 }

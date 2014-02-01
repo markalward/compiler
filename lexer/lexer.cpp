@@ -6,6 +6,10 @@
 
 using namespace std;
 
+bool isoct(char c) {return '0' <= c && c <= '7'; }
+bool ishex(char c) {return std::isdigit(c) || 'a' <= c && c <= 'f' ||
+		    'A' <= c && c <= 'F'; }
+
 /*
 	reads the current lexeme from the input. If it is a keyword, a keyword
 	token is returned. Otherwise, an identifier token is 
@@ -40,6 +44,12 @@ Token *IBTLLexer::makeLiteralToken(TokenName name)
 	return new LiteralToken(name, lexeme);
 }
 
+Token *IBTLLexer::makeNumToken(TokenName name, NumAttr attr)
+{
+	const char *lexeme = input.getLexeme();
+	return new NumToken(name, attr, lexeme);
+}
+
 
 Token *IBTLLexer::makeOpToken(TokenName name)
 {
@@ -67,8 +77,8 @@ Token *IBTLLexer::readString()
 	char c;
 	while(true) {
 		c = input.getChar();
-		if(c == EOF || c == '\n')
-			throw std::exception();
+		if(c == EOF)
+			throw LexException("missing end \"", input);
 		else if(c == '\"')
 			break;
 	}
@@ -77,59 +87,110 @@ Token *IBTLLexer::readString()
 }
 
 
-Token *IBTLLexer::readNumber()
+Token *IBTLLexer::readNumber(char c)
 {
-	char c;
-	int state = 0;
-	const int acceptInt = 6,
-		  acceptReal = 7,
-		  reject = 8; //the accept/reject states
+	enum {
+		q0, q1, q2, q3, q4, q5, q6, q7, q8, q9, q10, q11, q12,
+		q1_12, q1_8, q1_9, acceptDec, acceptOct, acceptHex,
+		acceptReal, reject
+	} state = q0;
 	
 	while(true) {
 		switch(state) {
-		case 0:
-			c = input.getChar();
-			if(std::isdigit(c)) state = 0;
-			else if(c == '.') state = 1;
-			else state = acceptInt;
-			break;
-		case 1:
-			c = input.getChar();
-			if(std::isdigit(c)) state = 2;
+		case q0:
+			if(c == '0') state = q1_8;
+			else if(std::isdigit(c)) state = q1_12;
+			else if(c == '.') state = q3;
 			else state = reject;
 			break;
-		case 2:
+		case q1:
 			c = input.getChar();
-			if(std::isdigit(c)) state = 2;
-			else if(c == 'e' || c == 'E') state = 3;
+			if(std::isdigit(c)) state = q1;
+			else if(c == '.') state = q2;
+			else state = reject;
+			break;
+		case q2:
+			c = input.getChar();
+			if(std::isdigit(c)) state = q2;
+			else if(c == 'e' || c == 'E') state = q5;
 			else state = acceptReal;
 			break;
-		case 3:
+		case q3:
 			c = input.getChar();
-			if(std::isdigit(c))  state = 5;
-			else if(c == '+' || c == '-') state = 4;
+			if(std::isdigit(c)) state = q4;
 			else state = reject;
 			break;
-		case 4:
+		case q4:
 			c = input.getChar();
-			if(std::isdigit(c)) state = 5;
-			else state = reject;
-			break;
-		case 5:
-			c = input.getChar();
-			if(std::isdigit(c)) state = 5;
+			if(std::isdigit(c)) state = q4;
+			else if(c == 'e' || c == 'E') state = q5;
 			else state = acceptReal;
 			break;
-		case acceptInt:
+		case q5:
+			c = input.getChar();
+			if(std::isdigit(c)) state = q6;
+			else if(c == '+' || c == '-') state = q7;
+			else state = reject;
+			break;
+		case q6:
+			c = input.getChar();
+			if(std::isdigit(c)) state = q6;
+			else state = acceptReal;
+			break;
+		case q7:
+			c = input.getChar();
+			if(std::isdigit(c)) state = q6;
+			else state = reject;
+			break;
+		case q1_8:
+			c = input.getChar();
+			if(c == 'x' || c == 'X') state = q10;
+			else if(isoct(c)) state = q1_9;
+			else if(std::isdigit(c)) state = q1;
+			else if(c == '.') state = q2;
+			else state = acceptDec;
+			break;
+		case q1_9:
+			c = input.getChar();
+			if(isoct(c)) state = q1_9;
+			else if(std::isdigit(c)) state = q1;
+			else if(c == '.') state = q2;
+			else state = acceptOct;
+			break;
+		case q1_12:
+			c = input.getChar();
+			if(std::isdigit(c)) state = q1_12;
+			else if(c == '.') state = q2;
+			else state = acceptDec;
+			break;
+		case q10:
+			c = input.getChar();
+			if(ishex(c)) state = q11;
+			else state = reject;
+			break;
+		case q11:
+			c = input.getChar();
+			if(ishex(c)) state = q11;
+			else state = acceptHex;
+			break;
+		case acceptDec:
 			input.putChar();
-			return makeLiteralToken(TK_INT);
+			return makeNumToken(TK_INT, ATTR_DEC);
+			break;
+		case acceptOct:
+			input.putChar();
+			return makeNumToken(TK_INT, ATTR_OCT);
+			break;
+		case acceptHex:
+			input.putChar();
+			return makeNumToken(TK_INT, ATTR_HEX);
 			break;
 		case acceptReal:
 			input.putChar();
-			return makeLiteralToken(TK_REAL);
+			return makeNumToken(TK_REAL, ATTR_NONE);
 			break;
 		case reject:
-			throw std::exception();
+			throw LexException("invalid numeric constant", input);
 		}
 	}
 }
@@ -163,7 +224,7 @@ Token *IBTLLexer::readRelop(char c)
 		if(next == '=')
 			return makeOpToken(TK_NE);
 		else
-			throw std::exception();
+			throw LexException("unrecognized operator", input);
 	}
 }
 
@@ -183,7 +244,7 @@ Token *IBTLLexer::readOp(char c)
 		c = input.getChar();
 		if(c == '=') return makeOpToken(TK_ASSIGN);
 		else
-			throw std::exception();
+			throw LexException("unrecognized operator", input);
 		break;
 	case '!':
 	case '<':
@@ -192,7 +253,7 @@ Token *IBTLLexer::readOp(char c)
 		return readRelop(c);
 		break;
 	default:
-		throw std::exception();
+		throw LexException("unrecognized operator", input);
 	}
 }
 
@@ -220,8 +281,8 @@ Token *IBTLLexer::getToken()
 		ret = readString();
 	else if(std::isalpha(c) || c == '_')
 		ret = readId();
-	else if(std::isdigit(c))
-		ret = readNumber();
+	else if(std::isdigit(c) || c == '.')
+		ret = readNumber(c);
 	else
 		ret = readOp(c);
 	

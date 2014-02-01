@@ -4,6 +4,7 @@
 
 #include <unordered_map> // c++11 only
 #include <string>
+#include <sstream>
 #include <parser/basenodes.h>
 
 enum TokenClass
@@ -209,6 +210,34 @@ struct LiteralToken : Token
 	}
 };
 
+enum NumAttr {
+	ATTR_NONE=0,
+	ATTR_DEC,
+	ATTR_OCT,
+	ATTR_HEX
+};
+
+struct NumToken : public LiteralToken
+{
+	NumAttr attr;
+	
+	NumToken(TokenName name, NumAttr attr, const char *val) :
+		LiteralToken(name, val),
+		attr(attr)
+	{}
+
+	std::string toString()
+	{
+		ostringstream str;
+		str << "<" << nameToString(name) << ", ";
+		if(attr == ATTR_DEC) str << "dec";
+		else if(attr == ATTR_OCT) str << "oct";
+		else if(attr == ATTR_HEX) str << "hex";
+		else str << "-";
+		str << ", " << val << ">";
+		return str.str();
+	}
+};
 
 
 
