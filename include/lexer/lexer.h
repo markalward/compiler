@@ -5,6 +5,7 @@
 #include <sstream>
 #include <lexer/reader.h>
 #include <lexer/token.h>
+#include <symtable.h>
 
 class LexException : public std::exception
 {
@@ -39,7 +40,7 @@ class IBTLLexer : public Lexer
 {
 private:
 	Reader &input;
-	KeywordTable keywordTable;
+	SymbolTable &symTable;
 
 public:
 	
@@ -55,10 +56,10 @@ public:
 	void readWs();
 
 public:
-	IBTLLexer(Reader &input) :
+	IBTLLexer(Reader &input, SymbolTable &symTable) :
 		Lexer(),
 		input(input),
-		keywordTable()
+		symTable(symTable)
 	{}
 
 	Token *getToken();

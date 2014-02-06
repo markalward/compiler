@@ -1,6 +1,7 @@
 
 #include <lexer/lexer.h>
 #include <parser/parser.h>
+#include <symtable.h>
 #include <getopt.h>
 #include <iostream>
 #include <fstream>
@@ -10,7 +11,7 @@ using namespace std;
 extern char *optarg;
 extern int optind, opterr, optopt;
 
-const char *optstr = "tp";
+const char *optstr = "tsp";
 const struct option longopts[] = {
 	{"help", 0, NULL, 'h'}
 };
@@ -21,6 +22,7 @@ Usage: 	%s -[t|p] file \n\
 	%s -[t|p] - \n\
 Options: \n\
 	-t	tokenize only \n\
+	-s	tokenize & show symbol table \n\
 	-p	tokenize & parse \n\
 ";
 
@@ -41,6 +43,15 @@ void printTokens(TokenStream &toks)
 	}
 }
 
+void printSymtable(Lexer &lex, SymbolTable &symTable)
+{
+	while(lex.getToken()->name != TK_EOF)
+		continue;
+
+	cout << "Symbol Table: " << endl;
+	symTable.display(cout);
+}
+
 void printParse(TokenStream &toks)
 {
 	unique_ptr<ParseNode> tree;
@@ -52,7 +63,7 @@ void printParse(TokenStream &toks)
 int main(int argc, char **argv)
 {
 	int opt;
-	bool tokens_only = false, parse_only = false;
+	bool tokens_only = false, parse_only = false, symbols_only = false;
 	string filename;
 	bool use_stdin;
 
@@ -63,6 +74,9 @@ int main(int argc, char **argv)
 			break;
 		case 't':
 			tokens_only = true;
+			break;
+		case 's':
+			symbols_only = true;
 			break;
 		case 'p':
 			parse_only = true;
@@ -84,11 +98,17 @@ int main(int argc, char **argv)
 	else in = new std::ifstream(filename);
 	Reader inputreader(in);
 	
+	SymbolTable symTable;
+
 	// create lexical analyzer
-	IBTLLexer lexer(inputreader);
+	IBTLLexer lexer(inputreader, symTable);
 	TokenStream tokstream(&lexer);
 	if(tokens_only) {
 		printTokens(tokstream);
+		exit(EXIT_SUCCESS);
+	}
+	else if(symbols_only) {
+		printSymtable(lexer, symTable);
 		exit(EXIT_SUCCESS);
 	}
 	else if(parse_only) {

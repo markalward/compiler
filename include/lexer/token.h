@@ -7,6 +7,8 @@
 #include <sstream>
 #include <parser/basenodes.h>
 
+class Token;
+
 enum TokenClass
 {
 	TK_BINOP = 0x0100,
@@ -103,7 +105,6 @@ public:
 
 	
 };
-
 
 
 struct Token : public Oper

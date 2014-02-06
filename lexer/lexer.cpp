@@ -3,6 +3,7 @@
 #include <lexer/lexer.h>
 #include <lexer/token.h>
 #include <lexer/reader.h>
+#include <symtable.h>
 
 using namespace std;
 
@@ -18,16 +19,7 @@ bool ishex(char c) {return std::isdigit(c) || 'a' <= c && c <= 'f' ||
 Token *IBTLLexer::makeIdToken()
 {
 	const char *lexeme = input.getLexeme();
-	TokenName keyword;
-	if(keywordTable.isKeyword(lexeme, keyword)) {
-		Token *ret = new Token(keyword);
-		return ret;
-	}
-	else {
-		IdToken *ret = new IdToken();
-		ret->val = lexeme;
-		return ret;
-	}
+	return symTable.install(lexeme);
 }
 
 
