@@ -44,15 +44,15 @@ private:
 
 public:
 	
-	Token *makeIdToken();
-	Token *makeLiteralToken(TokenName name);
-	Token *makeOpToken(TokenName name);
-	Token *makeNumToken(TokenName name, NumAttr attr);
-	Token *readId();
-	Token *readString();
-	Token *readNumber(char c);
-	Token *readRelop(char c);
-	Token *readOp(char c);
+	Token makeIdToken();
+	Token makeLiteralToken(TokenName name);
+	Token makeOpToken(TokenName name);
+	Token makeNumToken(TokenName name, NumAttr attr);
+	Token readId();
+	Token readString();
+	Token readNumber(char c);
+	Token readRelop(char c);
+	Token readOp(char c);
 	void readWs();
 
 public:
@@ -62,7 +62,7 @@ public:
 		symTable(symTable)
 	{}
 
-	Token *getToken();
+	Token getToken();
 };
 
 

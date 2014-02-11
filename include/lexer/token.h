@@ -5,62 +5,68 @@
 #include <unordered_map> // c++11 only
 #include <string>
 #include <sstream>
-#include <parser/basenodes.h>
 
 class Token;
 
-enum TokenClass
-{
-	TK_BINOP = 0x0100,
-	TK_UNOP = 0x0200,
-	TK_CONST = 0x0400,
-	TK_STATEMENT = 0x0800,
-	TK_TYPENAME = 0x1000
-};	
-
 enum TokenName {
-	TK_EOF=0,
+	TK_EOF = 0,
 
-	TK_STR = 	TK_CONST | 1,
-	TK_INT =	TK_CONST | 2,
-	TK_REAL =	TK_CONST | 3,	
-	TK_T =		TK_CONST | 4,
-	TK_F =		TK_CONST | 5,
+	TK_CONSTANT,	// strings, reals, ints, bools
+	TK_ID,		// identifiers
+	TK_BINOP,	// binary operators
+	TK_UNOP,	// unary operators
+	TK_MINUS,	// minus has to sit in a corner by itself because
+			// it has ambiguous meaning during parsing
+	TK_ASSIGN,
 
-	TK_LT =		TK_BINOP | 10, 
-	TK_LE =		TK_BINOP | 11,
-	TK_GT = 	TK_BINOP | 12,
-	TK_GE =		TK_BINOP | 13,
-	TK_EQ =		TK_BINOP | 14,		
-	TK_NE =		TK_BINOP | 15,
-	TK_PLUS =	TK_BINOP | 16,
-	TK_MINUS =	TK_BINOP | TK_UNOP | 17,
-	TK_MULT =	TK_BINOP | 18,
-	TK_DIV =	TK_BINOP | 19,
-	TK_EXP =	TK_BINOP | 20,
-	TK_MOD =	TK_BINOP | 21,
-	TK_AND =	TK_BINOP | 22,
-	TK_OR =		TK_BINOP | 23,
+	TK_OBRAK,	// [
+	TK_CBRAK,	// ]
+	TK_TYPE,	// bool, string, int, real
 	
-	TK_SIN =	TK_UNOP | 60,
-	TK_COS =	TK_UNOP | 61,
-	TK_TAN =	TK_UNOP | 62,
-	TK_NOT =	TK_UNOP | 63,
+	TK_IF,
+	TK_WHILE,
+	TK_LET,
+	TK_PRINT
+};
 
-	TK_OBRAK =	30,
-	TK_CBRAK =	31,
-	TK_ASSIGN =	32,
-	TK_ID =		33,
+enum TokenAttr {
+	AT_NONE = 0,
 
-	TK_IF =		TK_STATEMENT | 40,
-	TK_WHILE =	TK_STATEMENT | 41,
-	TK_LET = 	TK_STATEMENT | 42,
-	TK_PRINT =	TK_STATEMENT | 43,
+	// TK_CONSTANT attributes
+	AT_STR,
+	AT_INT_DEC,
+	AT_INT_OCT,
+	AT_INT_HEX,
+	AT_REAL,	
+	AT_T,
+	AT_F,
+
+	// TK_BINOP attributes
+	AT_LT,
+	AT_LE,
+	AT_GT,
+	AT_GE,
+	AT_EQ,		
+	AT_NE,
+	AT_PLUS,
+	AT_MULT,
+	AT_DIV,
+	AT_EXP,
+	AT_MOD,
+	AT_AND,
+	AT_OR,
 	
-	TK_KBOOL =	TK_TYPENAME | 50,
-	TK_KSTR =	TK_TYPENAME | 51,
-	TK_KINT =	TK_TYPENAME | 52,
-	TK_KREAL =	TK_TYPENAME | 53
+	// TK_UNOP attributes
+	AT_SIN,
+	AT_COS,
+	AT_TAN,
+	AT_NOT,
+
+	// TK_TYPE attributes
+	AT_KBOOL,
+	AT_KSTR,
+	AT_KINT,
+	AT_KREAL
 };
 
 
@@ -107,12 +113,16 @@ public:
 };
 
 
-struct Token : public Oper
+struct Token
 {
-	TokenName name;
-	
-	Token(TokenName name) :
-		name(name)
+	TokenName 	name;
+	TokenAttr 	attr;
+	SymbolEntry 	*ptr;
+
+	Token(TokenName name, TokenAttr attr = AT_NONE, SymbolEntry *ptr = NULL) :
+		name(name),
+		attr(attr),
+		ptr(ptr)
 	{}
 
 	static std::string nameToString(TokenName name)
@@ -171,75 +181,6 @@ struct Token : public Oper
 	}
 
 };
-
-
-/*
-	Represents an identifier (not including keywords)
-*/
-struct IdToken : Token
-{
-	std::string val;
-
-	IdToken() :
-		Token(TK_ID)
-	{}
-
-	std::string toString()
-	{
-		return std::string("<id, ") + val + std::string(">"); 
-	}
-
-};
-
-/*
-	Represents an int, real, or string. The token itself stores
-	the value as a string.
-*/
-struct LiteralToken : Token
-{
-	std::string val;
-
-	LiteralToken(TokenName name, const char *val) :
-		Token(name),
-		val(val)
-	{}
-
-	std::string toString()
-	{
-		return std::string("<") + nameToString(name) +
-			std::string(", ") + val + std::string(">");
-	}
-};
-
-enum NumAttr {
-	ATTR_NONE=0,
-	ATTR_DEC,
-	ATTR_OCT,
-	ATTR_HEX
-};
-
-struct NumToken : public LiteralToken
-{
-	NumAttr attr;
-	
-	NumToken(TokenName name, NumAttr attr, const char *val) :
-		LiteralToken(name, val),
-		attr(attr)
-	{}
-
-	std::string toString()
-	{
-		ostringstream str;
-		str << "<" << nameToString(name) << ", ";
-		if(attr == ATTR_DEC) str << "dec";
-		else if(attr == ATTR_OCT) str << "oct";
-		else if(attr == ATTR_HEX) str << "hex";
-		else str << "-";
-		str << ", " << val << ">";
-		return str.str();
-	}
-};
-
 
 
 #endif

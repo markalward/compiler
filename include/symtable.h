@@ -7,9 +7,20 @@
 #include <iostream>
 #include <string>
 
+struct SymbolEntry
+{
+	TokenName name;
+	TokenAttr attr;
+
+	SymbolEntry(TokenName name, TokenAttr attr = AT_NONE) :
+		name(name),
+		attr(attr)
+	{}
+};
+
 class SymbolTable
 {
-	typedef std::unordered_map<std::string, Token *> SymbolMap;
+	typedef std::unordered_map<std::string, SymbolEntry *> SymbolMap;
 	SymbolMap table;
 
 public:
@@ -17,26 +28,25 @@ public:
 		table()
 	{
 		// add keywords to table
-		table["if"] = new Token(TK_IF);
-		table["while"] = new Token(TK_WHILE);
+		table["if"] = new SymbolEntry(TK_IF);
+		table["while"] = new SymbolEntry(TK_WHILE);
+		table["let"] = new SymbolEntry(TK_LET);
+		table["stdout"] = new SymbolEntry(TK_PRINT);
 
-		table["let"] = new Token(TK_LET);
-		table["stdout"] = new Token(TK_PRINT);
+		table["bool"] = new SymbolEntry(TK_TYPE, AT_KBOOL);
+		table["int"] = new SymbolEntry(TK_TYPE, AT_KINT);
+		table["real"] = new SymbolEntry(TK_TYPE, AT_KREAL);
+		table["str"] = new SymbolEntry(TK_TYPE, AT_KSTR);
 
-		table["bool"] = new Token(TK_KBOOL);
-		table["int"] = new Token(TK_KINT);
-		table["real"] = new Token(TK_KREAL);
-		table["str"] = new Token(TK_KSTR);
-
-		table["true"] = new Token(TK_T);
-		table["false"] = new Token(TK_F);
+		table["true"] = new Token(TK_CONSTANT, AT_T);
+		table["false"] = new Token(TK_CONSTANT, AT_F);
 		
-		table["and"] = new Token(TK_AND);
-		table["or"] = new Token(TK_OR);
-		table["not"] = new Token(TK_NOT);
-		table["sin"] = new Token(TK_SIN);
-		table["cos"] = new Token(TK_COS);
-		table["tan"] = new Token(TK_TAN);
+		table["and"] = new SymbolEntry(TK_BINOP, AT_AND);
+		table["or"] = new SymbolEntry(TK_BINOP, AT_OR);
+		table["not"] = new SymbolEntry(TK_UNOP, AT_NOT);
+		table["sin"] = new SymbolEntry(TK_UNOP, TK_SIN);
+		table["cos"] = new SymbolEntry(TK_UNOP, TK_COS);
+		table["tan"] = new SymbolEntry(TK_UNOP, TK_TAN);
 	}
 
 	/*
@@ -44,13 +54,12 @@ public:
 		token with matching lexeme is already in the table, a 
 		pointer to this token is returned.
 	*/
-	Token *install(const char *val) 
+	SymbolEntry *install(const char *val) 
 	{
 		auto iter = table.find(val);
 		if(iter == table.end()) {
-			// add new token
-			IdToken *tok = new IdToken;
-			tok->val = val;
+			// add new entry
+			SymbolEntry *tok = new SymbolEntry;
 			table[tok->val] = tok;
 			return tok;
 		}
