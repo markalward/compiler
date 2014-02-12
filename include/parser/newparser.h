@@ -50,8 +50,6 @@ class IBTLParser
 	VarListNode *varlist();
 	VarListNode *varlist(VarListNode *list);
 	VarListNode *varlist_p(VarListNode *list);
-	// "declarations must precede usage" said the person on the 
-	// standards committee. "bang" said the gun when we shot him 	
 	
 
 	inline void require(TokenName expect)
