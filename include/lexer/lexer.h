@@ -32,7 +32,7 @@ class Lexer
 {
 public:
 
-	virtual Token *getToken() = 0;
+	virtual Token getToken() = 0;
 };
 
 
@@ -45,9 +45,8 @@ private:
 public:
 	
 	Token makeIdToken();
-	Token makeLiteralToken(TokenName name);
-	Token makeOpToken(TokenName name);
-	Token makeNumToken(TokenName name, NumAttr attr);
+	Token makeLiteralToken(TokenAttr attr);
+	Token makeOpToken(TokenName name, TokenAttr attr);
 	Token readId();
 	Token readString();
 	Token readNumber(char c);

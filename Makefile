@@ -1,10 +1,10 @@
 
 # OBJS get built with built-in make rules
 OBJS = lexer/lexer.o lexer/reader.o \
-	parser/parser.o parser/tokenstream.o \
+	parser/newparser.o \
 	compiler.o
 
-INCS = -Iinclude
+INCS = -I./include
 
 LD = g++
 CXXFLAGS = -std=c++0x $(INCS)

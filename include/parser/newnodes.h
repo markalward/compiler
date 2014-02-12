@@ -1,17 +1,57 @@
 
+#ifndef NODES_H
+#define NODES_H
+
 #include <vector>
 #include <string>
+#include <iostream>
+#include <sstream>
 #include <initializer_list>
+#include <lexer/token.h>
 
-static std::ostream &operator <<(std::ostream &str, const Node &node);
+typedef Token tok;
+class Node;
+class ProgramNode;
+class ScopeNode;
+class ScopeListNode;
+class ContainerScopeNode;
+class ExprNode;
+class OperNode;
+class StmtNode;
+class TokNode;
+class BinopNode;
+class UnopNode;
+class AssignNode;
+class IfNode;
+class WhileNode;
+class LetNode;
+class PrintNode;
+class ExprListNode;
+class VarListNode;
+
+std::ostream &operator <<(std::ostream &str, Node &node);
+std::ostream &operator <<(std::ostream &str, TokNode &tok);
 
 class Node
 {
-	std::vector<Node *> children;
-	
+	friend std::ostream &operator<<(std::ostream &, const Node &);
+
+public:
+	typedef std::vector<Node *> NodeArray;
+	NodeArray children;
+	bool isToken;
+
 protected:
-	Node(std::initializer_list<Node *> children) :
-		children(children)
+	
+
+	Node(NodeArray children) :
+		children(children),
+		isToken(false)
+	{}
+
+	Node(bool isToken = false) :
+		children(),
+		isToken(isToken)
 	{}
 
 public:
@@ -31,61 +71,44 @@ public:
 	
 };
 
-static std::ostream &operator <<(std::ostream &str, const Node &node)
-{
-	str << "[" << node.name();
-	for(auto iter = node.children.cbegin(); iter != children.cend();
-	    iter++)
-		str << " " << **iter;
-	return (str << "]");
-}
-
-class ProgramNode : public Node
-{
-public:
-	ProgramNode(ScopeNode *scope) :
-		Node({scope})
-	{}
-
-	std::string name() {return std::string("program"); }
-};
-
 class ScopeNode : public Node
 {
 public:
 	ScopeNode() :
-		Node({})
-	{}
-};
-
-class ScopeListNode : public Node
-{
-public:
-	ScopeListNode()
-		Node({})
+		Node()
 	{}
 
+	virtual std::string name() {return std::string("scope"); }
 };
 
 class ContainerScopeNode : public ScopeNode
 {
 public:
-	ContainerScopeNode(ScopeList *list) :
-		ScopeNode({list})
+	ContainerScopeNode() :
+		ScopeNode()
 	{}
 
-	ContainerScopeNode() :
-		ScopeNode({new ScopeList})
-	{}
 };
 
+
+class ProgramNode : public Node
+{
+public:
+	ProgramNode(ContainerScopeNode *sc) :
+		Node()
+	{
+		children.push_back(sc);
+	}
+
+	std::string name() {return std::string("program"); }
+};
 
 
 class ExprNode : public ScopeNode
 {
 protected:
-	ExprNode(std::initializer_list<Node *children) :
-		Node(children)
+	ExprNode() :
+		ScopeNode()
 	{}
 public:
 	virtual ~ExprNode() {}
@@ -94,8 +117,8 @@ public:
 class StmtNode : public ExprNode
 {
 protected:
-	StmtNode(std::initializer_list<Node *> children) :
-		ExprNode(children)
+	StmtNode() :
+		ExprNode()
 	{}
 public:
 	virtual ~StmtNode() {}
@@ -104,24 +127,55 @@ public:
 class OperNode : public ExprNode
 {
 protected:
-	OperNode(std::initializer_list<Node *> children) :
-		ExprNode(children)
+	OperNode() :
+		ExprNode()
 	{}
 public:
 	virtual ~OperNode() {}
 };
 
-class TokNode : public Node
+class TokNode : public OperNode
 {
-private:
+	friend std::ostream &operator <<(std::ostream &str, TokNode &tok);
 	tok token;
 
 public:
 	TokNode(tok token) :
-		Node({}),
+		OperNode(),
 		token(token)
-	{}
+	{
+		isToken = true;
+	}
+
+	std::string name() {
+		std::ostringstream str;
+		str << token;
+		return str.str();
+	}
+
 };
+
+class ExprListNode : public Node
+{
+public:
+	ExprListNode() :
+		Node()
+	{}
+
+	std::string name() {return std::string("exprlist"); }
+};
+
+class VarListNode : public Node
+{
+public:
+	VarListNode() :
+		Node()
+	{}
+
+	std::string name() {return std::string("varlist"); }
+};
+
+
 
 // opers
 
@@ -129,8 +183,12 @@ class BinopNode : public OperNode
 {
 public:
 	BinopNode(TokNode *op, OperNode *l, OperNode *r) :
-		OperNode({op, l, r})
-	{}
+		OperNode()
+	{
+		children.push_back(op);
+		children.push_back(l);
+		children.push_back(r);
+	}
 
 	std::string name() {return std::string("binop"); }
 };
@@ -139,8 +197,11 @@ class UnopNode : public OperNode
 {
 public:
 	UnopNode(TokNode *op, OperNode *l) :
-		OperNode({op, l})
-	{}
+		OperNode()
+	{
+		children.push_back(op);
+		children.push_back(l);
+	}
 
 	std::string name() {return std::string("unop"); }
 };
@@ -149,8 +210,11 @@ class AssignNode : public OperNode
 {
 public:
 	AssignNode(TokNode *name, OperNode *oper) :
-		OperNode({name, oper})
-	{}
+		OperNode()
+	{
+		children.push_back(name);
+		children.push_back(oper);
+	}
 	
 	std::string name() {return std::string("assign"); }
 };
@@ -160,9 +224,13 @@ public:
 class IfNode : public StmtNode
 {
 public:
-	IfNode(ExprNode *condExpr, StmtNode *thenStmt, StmtNode *elseStmt) :
-		StmtNode({condExpr, thenStmt, elseStmt})
-	{}
+	IfNode(ExprNode *condExpr, ExprNode *thenStmt, ExprNode *elseStmt) :
+		StmtNode()
+	{
+		children.push_back(condExpr);
+		children.push_back(thenStmt);
+		children.push_back(elseStmt);
+	}
 
 	std::string name() {return std::string("if"); }	
 };
@@ -171,8 +239,11 @@ class WhileNode : public StmtNode
 {
 public:
 	WhileNode(ExprNode *condExpr, ExprListNode *bodyList) :
-		StmtNode({condExpr, bodyList})
-	{}
+		StmtNode()
+	{
+		children.push_back(condExpr);
+		children.push_back(bodyList);
+	}
 
 	std::string name() {return std::string("while"); }
 };
@@ -180,9 +251,11 @@ public:
 class LetNode : public StmtNode
 {
 public:
-	LetNode(VarlistNode *varlist) :
-		StmtNode({varList})
-	{}
+	LetNode(VarListNode *varlist) :
+		StmtNode()
+	{
+		children.push_back(varlist);
+	}
 
 	std::string name() {return std::string("let"); }
 };
@@ -191,29 +264,13 @@ class PrintNode : public StmtNode
 {
 public:
 	PrintNode(OperNode *oper) :
-		StmtNode({oper})
-	{}
+		StmtNode()
+	{
+		children.push_back(oper);
+	}
 
 	std::string name() {return std::string("print"); }
 };
 
-class ExprListNode : public Node
-{
-public:
-	ExprListNode(ExprNode *expr, ExprListNode *next) :
-		Node({expr, next})
-	{}
-
-	std::string name() {return std::string("exprlist"); }
-};
-
-class VarListNode : public Node
-{
-	VarListNode() :
-		Node({})
-	{}
-
-	std::string name() {return std::string("varlist"); }
-};
-
+#endif
 

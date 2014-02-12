@@ -1,6 +1,7 @@
 
 #include <lexer/lexer.h>
-#include <parser/parser.h>
+#include <parser/newparser.h>
+// #include <parser/parser.h>
 #include <symtable.h>
 #include <getopt.h>
 #include <iostream>
@@ -32,33 +33,26 @@ void printUsageAndDie(const char *prog)
 	exit(EXIT_FAILURE);
 }
 
-void printTokens(TokenStream &toks)
+void printTokens(IBTLLexer &lex)
 {
-	unique_ptr<Token> cur;
+	Token cur;
 	while(true) {
-		cur = toks.take();
-		if(cur->name == TK_EOF) break;
+		cur = lex.getToken();
+		if(cur.name == TK_EOF) break;
 		else
-			cout << cur->toString() << endl;
+			cout << cur << endl;
 	}
 }
 
-void printSymtable(Lexer &lex, SymbolTable &symTable)
-{
-	while(lex.getToken()->name != TK_EOF)
-		continue;
 
-	cout << "Symbol Table: " << endl;
-	symTable.display(cout);
+void printParse(IBTLParser &parser)
+{
+	ProgramNode *p = parser.parse();
+	cout << *p << endl;
 }
 
-void printParse(TokenStream &toks)
-{
-	unique_ptr<ParseNode> tree;
-	IBTLParser parser;
-	tree = parser.parse(toks);
-	cout << tree->toString() << endl;
-}
+
+
 
 int main(int argc, char **argv)
 {
@@ -102,19 +96,16 @@ int main(int argc, char **argv)
 
 	// create lexical analyzer
 	IBTLLexer lexer(inputreader, symTable);
-	TokenStream tokstream(&lexer);
 	if(tokens_only) {
-		printTokens(tokstream);
-		exit(EXIT_SUCCESS);
-	}
-	else if(symbols_only) {
-		printSymtable(lexer, symTable);
+		printTokens(lexer);
 		exit(EXIT_SUCCESS);
 	}
 	else if(parse_only) {
-		printParse(tokstream);
+		IBTLParser parser(lexer);
+		printParse(parser);
 		exit(EXIT_SUCCESS);
 	}
+	
 
 }
 

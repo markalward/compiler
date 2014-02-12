@@ -4,9 +4,11 @@
 
 #include <unordered_map> // c++11 only
 #include <string>
+#include <iostream>
 #include <sstream>
 
-class Token;
+
+struct Token;
 
 enum TokenName {
 	TK_EOF = 0,
@@ -70,117 +72,114 @@ enum TokenAttr {
 };
 
 
-class KeywordTable
-{
-	typedef std::unordered_map<std::string, TokenName> KeywordMap;
-	KeywordMap table;
-
-public:
-
-	KeywordTable()
-	{
-		table["if"] = TK_IF;
-		table["while"] = TK_WHILE;
-
-		table["let"] = TK_LET;
-		table["stdout"] = TK_PRINT;
-
-		table["bool"] = TK_KBOOL;
-		table["int"] = TK_KINT;
-		table["real"] = TK_KREAL;
-		table["str"] = TK_KSTR;
-
-		table["true"] = TK_T;
-		table["false"] = TK_F;
-		
-		table["and"] = TK_AND;
-		table["or"] = TK_OR;
-		table["not"] = TK_NOT;
-		table["sin"] = TK_SIN;
-		table["cos"] = TK_COS;
-		table["tan"] = TK_TAN;
-	}
-
-	bool isKeyword(const char *val, TokenName &keyword)
-	{
-		KeywordMap::iterator iter = table.find(val);
-		if(iter == table.end()) return false;		
-		keyword = iter->second;
-		return true;
-	}
-
-	
-};
-
-
 struct Token
 {
 	TokenName 	name;
 	TokenAttr 	attr;
-	SymbolEntry 	*ptr;
+	std::string 	val;
 
-	Token(TokenName name, TokenAttr attr = AT_NONE, SymbolEntry *ptr = NULL) :
+	// for tokens that store a lexeme value
+	Token(const char *val, TokenName name, TokenAttr attr = AT_NONE) :
 		name(name),
 		attr(attr),
-		ptr(ptr)
+		val(val)
 	{}
+
+	// for tokens that do not store a lexeme value
+	Token(TokenName name, TokenAttr attr = AT_NONE) :
+		name(name),
+		attr(attr),
+		val()
+	{}
+
+	Token() :
+		name(),
+		attr(),
+		val()
+	{}
+
+	/*
+		the 'val' field of a token can consume a lot of space. The
+		move ctor ensures that only the underlying pointer to the 
+		string (and not the string itself) is copied when a token
+		is moved
+
+		Note: when a non-temporary Token is copied, we still need 
+		a deep copy of the 'val' field
+	*/
+	Token(Token &&other) :
+		name(other.name),
+		attr(other.attr),
+		val(std::move(other.val))
+	{}
+
+	Token &operator =(Token &&other)
+	{
+		name = other.name;
+		attr = other.attr;
+		val = std::move(other.val);
+	}
+
 
 	static std::string nameToString(TokenName name)
 	{
 		switch(name) {
 		case TK_EOF: return "eof";
-		case TK_STR: return "str";
-		case TK_INT: return "int";
-		case TK_REAL: return "real";
-		case TK_T: return "true";
-		case TK_F: return "false";
-		
-		case TK_LT: return "<";
-		case TK_LE: return "<=";
-		case TK_GT: return ">";
-		case TK_GE: return ">=";
-		case TK_EQ: return "=";
-		case TK_NE: return "!=";
-		case TK_PLUS: return "+";
-		case TK_MINUS: return "-";
-		case TK_MULT: return "*";
-		case TK_DIV: return "/";
-		case TK_EXP: return "^";
-		case TK_MOD: return "%";
-		case TK_AND: return "and";
-		case TK_OR: return "or";
-
-		case TK_SIN: return "sin";
-		case TK_COS: return "cos";
-		case TK_TAN: return "tan";
-		case TK_NOT: return "not";
-
+		case TK_CONSTANT: return "constant";
 		case TK_ID: return "id";
+		case TK_BINOP: return "binop";
+		case TK_UNOP: return "unop";
+		case TK_MINUS: return "minus";
+		case TK_ASSIGN: return "assign";
 		case TK_OBRAK: return "[";
 		case TK_CBRAK: return "]";
-		case TK_ASSIGN: return "assign";
-
+		case TK_TYPE: return "type";
 		case TK_IF: return "if";
 		case TK_WHILE: return "while";
 		case TK_LET: return "let";
 		case TK_PRINT: return "print";
-
-		case TK_KBOOL: return "type-bool";
-		case TK_KSTR: return "type-str";
-		case TK_KINT: return "type-int";
-		case TK_KREAL: return "type-real";
-
 		default: return "";
 		}
 	}
 
-	virtual std::string toString()
+	static std::string attrToString(TokenAttr attr)
 	{
-		return std::string("<") + nameToString(name) +
-			std::string(">");	
+		switch(attr) {
+		case AT_STR: return "str";
+		case AT_INT_DEC: return "int-dec";
+		case AT_INT_OCT: return "int-oct";
+		case AT_INT_HEX: return "int-hex";
+		case AT_REAL: return "real";
+		case AT_T: return "true";
+		case AT_F: return "false";
+		case AT_LT: return "<";
+		case AT_LE: return "<=";
+		case AT_GT: return ">";
+		case AT_GE: return ">=";
+		case AT_EQ: return "=";
+		case AT_NE: return "!=";
+		case AT_PLUS: return "+";
+		case AT_MULT: return "*";
+		case AT_DIV: return "/";
+		case AT_EXP: return "^";
+		case AT_MOD: return "%";
+		case AT_AND: return "and";
+		case AT_OR: return "or";
+		case AT_SIN: return "sin";
+		case AT_COS: return "cos";
+		case AT_TAN: return "tan";
+		case AT_NOT: return "not";
+		case AT_KBOOL: return "bool";
+		case AT_KSTR: return "str";
+		case AT_KINT: return "int";
+		case AT_KREAL: return "real";
+		default: return "";
+		}
 	}
 
 };
+
+std::ostream &operator <<(std::ostream &str, Token &tok);
 
 
 #endif

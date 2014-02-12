@@ -19,7 +19,16 @@ bool ishex(char c) {return std::isdigit(c) || 'a' <= c && c <= 'f' ||
 Token IBTLLexer::makeIdToken()
 {
 	const char *lexeme = input.getLexeme();
-	return Token(TK_ID, AT_NONE, symTable.install(lexeme));
+	Token tok;
+
+	// the token is only an identifier if the symbol table says its
+	// not a keyword
+	if(!symTable.isKeyword(lexeme, tok.name, tok.attr)) {
+		tok.name = TK_ID;
+		tok.attr = AT_NONE;
+		tok.val = std::string(lexeme);
+	}
+	return tok;
 }
 
 
@@ -31,15 +40,16 @@ Token IBTLLexer::makeIdToken()
 Token IBTLLexer::makeLiteralToken(TokenAttr attr)
 {
 	const char *lexeme = input.getLexeme();
-	// note: the lexeme string is copied into the token, which could be
-	// expensive
-	return Token(TK_CONSTANT, attr, symTable.install(lexeme));
+	// note: the Token is an rvalue, so its move ctor will be invoked and
+	// cause efficient copying of lexeme
+	return Token(lexeme, TK_CONSTANT, attr);
 }
 
 
 Token IBTLLexer::makeOpToken(TokenName name, TokenAttr attr)
 {
-	return Token(name, attr, NULL);
+	// no associated lexeme
+	return Token(name, attr);
 }
 
 
@@ -173,7 +183,7 @@ Token IBTLLexer::readNumber(char c)
 			break;
 		case acceptReal:
 			input.putChar();
-			return makeNumToken(TK_REAL, ATTR_NONE);
+			return makeLiteralToken(AT_REAL);
 			break;
 		case reject:
 			throw LexException("invalid numeric constant", input);
@@ -275,4 +285,14 @@ Token IBTLLexer::getToken()
 	input.clearLexeme();
 	return ret;
 }
+
+
+std::ostream &operator <<(std::ostream &str, Token &tok)
+{
+	str << "<" << Token::nameToString(tok.name) << ", " <<
+		Token::attrToString(tok.attr);
+	if(!tok.val.empty()) str << ", " << tok.val;
+	return str << ">";
+}
+
 

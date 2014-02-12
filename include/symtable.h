@@ -4,76 +4,96 @@
 
 #include <lexer/token.h>
 #include <unordered_map>
+#include <vector>
 #include <iostream>
 #include <string>
 
-struct SymbolEntry
+struct SymbolData;
+class SymbolTable;
+
+typedef std::pair<const std::string, SymbolData *> SymbolEntry;
+
+// the data associated with each identifier in the table
+struct SymbolData
 {
 	TokenName name;
 	TokenAttr attr;
 
-	SymbolEntry(TokenName name, TokenAttr attr = AT_NONE) :
+	SymbolData(TokenName name, TokenAttr attr = AT_NONE) :
 		name(name),
 		attr(attr)
 	{}
+
+	SymbolData() :
+		name(),
+		attr()
+	{}
 };
+
+typedef std::unordered_map<std::string, SymbolData> ScopeTable;
 
 class SymbolTable
 {
-	typedef std::unordered_map<std::string, SymbolEntry *> SymbolMap;
-	SymbolMap table;
+	std::vector<ScopeTable> table;
 
 public:
 	SymbolTable() :
 		table()
 	{
-		// add keywords to table
-		table["if"] = new SymbolEntry(TK_IF);
-		table["while"] = new SymbolEntry(TK_WHILE);
-		table["let"] = new SymbolEntry(TK_LET);
-		table["stdout"] = new SymbolEntry(TK_PRINT);
+		// add outermost (global) scope to table
+		table.push_back(ScopeTable());
 
-		table["bool"] = new SymbolEntry(TK_TYPE, AT_KBOOL);
-		table["int"] = new SymbolEntry(TK_TYPE, AT_KINT);
-		table["real"] = new SymbolEntry(TK_TYPE, AT_KREAL);
-		table["str"] = new SymbolEntry(TK_TYPE, AT_KSTR);
+		// add keywords to global scope
+		ScopeTable &glob = table.front();
 
-		table["true"] = new Token(TK_CONSTANT, AT_T);
-		table["false"] = new Token(TK_CONSTANT, AT_F);
+		glob["if"] = SymbolData(TK_IF);
+		glob["while"] = SymbolData(TK_WHILE);
+		glob["let"] = SymbolData(TK_LET);
+		glob["stdout"] = SymbolData(TK_PRINT);
+
+		glob["bool"] = SymbolData(TK_TYPE, AT_KBOOL);
+		glob["int"] = SymbolData(TK_TYPE, AT_KINT);
+		glob["real"] = SymbolData(TK_TYPE, AT_KREAL);
+		glob["str"] = SymbolData(TK_TYPE, AT_KSTR);
+
+		glob["true"] = SymbolData(TK_CONSTANT, AT_T);
+		glob["false"] = SymbolData(TK_CONSTANT, AT_F);
 		
-		table["and"] = new SymbolEntry(TK_BINOP, AT_AND);
-		table["or"] = new SymbolEntry(TK_BINOP, AT_OR);
-		table["not"] = new SymbolEntry(TK_UNOP, AT_NOT);
-		table["sin"] = new SymbolEntry(TK_UNOP, TK_SIN);
-		table["cos"] = new SymbolEntry(TK_UNOP, TK_COS);
-		table["tan"] = new SymbolEntry(TK_UNOP, TK_TAN);
+		glob["and"] = SymbolData(TK_BINOP, AT_AND);
+		glob["or"] = SymbolData(TK_BINOP, AT_OR);
+		glob["not"] = SymbolData(TK_UNOP, AT_NOT);
+		glob["sin"] = SymbolData(TK_UNOP, AT_SIN);
+		glob["cos"] = SymbolData(TK_UNOP, AT_COS);
+		glob["tan"] = SymbolData(TK_UNOP, AT_TAN);
 	}
+
+	
+	inline ScopeTable &top() {return table.back(); }
+	inline void push() {table.push_back(ScopeTable()); }
+	inline void push(const ScopeTable &scope) {table.push_back(scope); }
+	inline void pop() {table.pop_back(); }
+	
+	// returns the global scope, which is always at the bottom of the 
+	// stack
+	inline ScopeTable &globals() {return table[0]; }
 
 	/*
-		installs the lexeme 'val' into the symbol table. If a 
-		token with matching lexeme is already in the table, a 
-		pointer to this token is returned.
+		helper function for lexer to determine whether a lexeme is
+		a keyword. If it is, 'name' and 'attr' describe the matching
+		keyword.
 	*/
-	SymbolEntry *install(const char *val) 
+	bool isKeyword(const char *lexeme, TokenName &name, TokenAttr &attr)
 	{
-		auto iter = table.find(val);
-		if(iter == table.end()) {
-			// add new entry
-			SymbolEntry *tok = new SymbolEntry;
-			table[tok->val] = tok;
-			return tok;
+		ScopeTable &glob = globals();
+		auto iter = glob.find(lexeme);
+		if(iter != glob.end()) {
+			SymbolData &dat = iter->second;
+			name = dat.name;
+			attr = dat.attr;
+			return true;
 		}
-		else {
-			// return existing token
-			return iter->second;
-		}
-	}
-
-	void display(std::ostream &str)
-	{
-		for(auto iter = table.begin(); iter != table.end(); iter++) {
-			str << iter->second->toString() << endl;
-		}
+		else
+			return false;
 	}
 };
 
