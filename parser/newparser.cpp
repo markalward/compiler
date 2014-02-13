@@ -33,6 +33,7 @@ ProgramNode *IBTLParser::T() {
 	discard(TK_OBRAK);
 	ProgramNode *t = new ProgramNode(scopelist());
 	discard(TK_CBRAK);
+	discard(TK_EOF);
 	return t;
 }
 
@@ -113,6 +114,7 @@ OperNode *IBTLParser::oper() {
 	if(is(TK_OBRAK)) 	return oper1();
 	if(is(TK_CONSTANT)) 	return constant();
 	if(is(TK_ID)) 		return id(); 
+	err("invalid oper");
 }
 
 OperNode *IBTLParser::oper1() {
@@ -191,13 +193,17 @@ StmtNode *IBTLParser::stmtsuffix() {
 
 IfNode *IBTLParser::ifstmts() {
 	discard(TK_IF);
-	IfNode *t = new IfNode(expr(), expr(), ifstmts_p());
+	IfNode *t = new IfNode(expr(), expr());
+	ExprNode *elseStmt = ifstmts_p();	
+	if(elseStmt)
+		t->children.push_back(elseStmt);
 	discard(TK_CBRAK);
 	return t;
 }
 
 ExprNode *IBTLParser::ifstmts_p() {
-	if(is(TK_OBRAK)) return expr();
+	if(is(TK_OBRAK) || is(TK_ID) || is(TK_CONSTANT))
+		 return expr();
 	if(is(TK_CBRAK)) return NULL;
 	err("invalid if statement");
 }
@@ -237,7 +243,8 @@ ExprListNode *IBTLParser::exprlist(ExprListNode *list) {
 }
 
 ExprListNode *IBTLParser::exprlist_p(ExprListNode *list) {
-	if(is(TK_OBRAK))	return exprlist(list);
+	if(is(TK_OBRAK) || is(TK_CONSTANT) || is(TK_ID))
+		return exprlist(list);
 	if(is(TK_CBRAK))	return list;
 	err("invalid exprlist");
 }

@@ -8,6 +8,28 @@
 #include <string>
 
 
+class ParseException : public std::exception
+{
+	std::string msg;
+	int line;
+public:
+	
+	ParseException(const std::string &msg, int line) :
+		msg(msg),
+		line(line)
+	{}
+
+	~ParseException() throw() {}
+	
+	const char *what() const throw()
+	{
+		std::ostringstream str;
+		str << "line " << line << ": " << msg;
+		return str.str().c_str();
+	}
+};
+
+
 class IBTLParser
 {
 	IBTLLexer &lexer;
@@ -51,10 +73,16 @@ class IBTLParser
 	VarListNode *varlist(VarListNode *list);
 	VarListNode *varlist_p(VarListNode *list);
 	
+	void err(const char *msg)
+	{
+		throw ParseException(msg, lexer.line());
+	}
+
 
 	inline void require(TokenName expect)
 	{
-		if(cur.name != expect) throw std::exception(); // TODO: exception details
+		if(cur.name != expect) err(
+			(std::string("expected ") + std::string(Token::nameToString(expect))).c_str());
 	}
 
 	/*
@@ -84,11 +112,7 @@ class IBTLParser
 	*/
 	inline bool is(TokenName name) {return cur.name == name; }
 	
-	void err(const char *msg)
-	{
-		throw std::exception();
-	}
-
+	
 public:
 	IBTLParser(IBTLLexer &lexer) :
 		lexer(lexer),

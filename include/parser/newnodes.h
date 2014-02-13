@@ -224,12 +224,12 @@ public:
 class IfNode : public StmtNode
 {
 public:
-	IfNode(ExprNode *condExpr, ExprNode *thenStmt, ExprNode *elseStmt) :
+	IfNode(ExprNode *condExpr, ExprNode *thenStmt, ExprNode *elseStmt = NULL) :
 		StmtNode()
 	{
 		children.push_back(condExpr);
 		children.push_back(thenStmt);
-		children.push_back(elseStmt);
+		if(elseStmt) children.push_back(elseStmt);
 	}
 
 	std::string name() {return std::string("if"); }	

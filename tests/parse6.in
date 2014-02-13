@@ -1,0 +1,45 @@
+
+[
+	[if [if a b] c]
+
+	[let [
+		[a int]
+		[b real]
+		[c bool]
+		[d bool]
+		]
+	]
+
+	[let [
+		[a int]
+		]
+	]
+
+	[if hello 
+		[while a
+			b c d
+			[if a [+ 1 2] [+ 3 4]]
+		]
+
+		a]
+	]
+
+	[stdout [+ 1 [* 3 true]] ]
+
+	[
+		[stdout "nested scope"]
+	]
+
+	[- [^ 2 3] 100]
+
+	[while true
+		asdf asdf asdf [while false 5]
+	]
+
+	[[[[]]]]
+
+	true false
+
+	[-1] [sin [^ x 2]]
+]
+

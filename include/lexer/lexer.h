@@ -62,6 +62,8 @@ public:
 	{}
 
 	Token getToken();
+
+	int line() {return input.getStartLine(); }
 };
 
 
