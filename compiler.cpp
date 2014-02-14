@@ -1,7 +1,6 @@
 
 #include <lexer/lexer.h>
 #include <parser/newparser.h>
-// #include <parser/parser.h>
 #include <symtable.h>
 #include <getopt.h>
 #include <iostream>
@@ -20,10 +19,8 @@ const struct option longopts[] = {
 const char *helpstr = "\
 IBTL Compiler \n\
 Usage: 	%s -[t|p] file \n\
-	%s -[t|p] - \n\
 Options: \n\
 	-t	tokenize only \n\
-	-s	tokenize & show symbol table \n\
 	-p	tokenize & parse \n\
 ";
 
@@ -45,10 +42,12 @@ void printTokens(IBTLLexer &lex)
 }
 
 
-void printParse(IBTLParser &parser)
+void printParse(IBTLLexer &lexer)
 {
+	IBTLParser parser(lexer);
 	ProgramNode *p = parser.parse();
 	cout << *p << endl;
+	delete p;
 }
 
 
@@ -84,28 +83,26 @@ int main(int argc, char **argv)
 		}
 	}
 
-	if(string(argv[optind]) == string("-")) use_stdin = true;
-	else filename = argv[optind];
-
-	std::istream *in;
-	if(use_stdin) in = &std::cin;
-	else in = new std::ifstream(filename);
-	Reader inputreader(in);
-	
-	SymbolTable symTable;
-
-	// create lexical analyzer
-	IBTLLexer lexer(inputreader, symTable);
-	if(tokens_only) {
-		printTokens(lexer);
-		exit(EXIT_SUCCESS);
+	// main file processing loop
+	int idx = optind;
+	while(idx < argc) {
+		filename = argv[idx];
+		ifstream in(filename);
+		if(!in) {
+			cout << "error: could not open file " << filename << endl;
+			exit(EXIT_FAILURE);
+		}
+		cout << "Processing " << filename << endl;
+		Reader inputReader(&in);
+		SymbolTable symTable;
+		IBTLLexer lexer(inputReader, symTable);
+		if(tokens_only) printTokens(lexer);
+		else if(parse_only) printParse(lexer);
+		else printParse(lexer); // parse by default
+		cout << endl;
+		idx++;
 	}
-	else if(parse_only) {
-		IBTLParser parser(lexer);
-		printParse(parser);
-		exit(EXIT_SUCCESS);
-	}
-	
 
+	exit(EXIT_SUCCESS);
 }
 
