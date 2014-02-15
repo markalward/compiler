@@ -42,12 +42,23 @@ void printTokens(IBTLLexer &lex)
 }
 
 
-void printParse(IBTLLexer &lexer)
+void printParse(IBTLLexer &lexer, const string &filename)
 {
 	IBTLParser parser(lexer);
-	ProgramNode *p = parser.parse();
-	cout << *p << endl;
-	delete p;
+	try {
+		ProgramNode *p = parser.parse();
+		cout << "Parse tree for " << filename << ":" << endl;
+		cout << *p << endl;
+		delete p;
+	}
+	catch(ParseException &ex) {
+		cout << "parse error: " << ex.what() << endl;
+		exit(EXIT_FAILURE);
+	}
+	catch(LexException &ex) {
+		cout << "lexer error: " << ex.what() << endl;
+		exit(EXIT_FAILURE);
+	}
 }
 
 
@@ -92,13 +103,12 @@ int main(int argc, char **argv)
 			cout << "error: could not open file " << filename << endl;
 			exit(EXIT_FAILURE);
 		}
-		cout << "Processing " << filename << endl;
 		Reader inputReader(&in);
 		SymbolTable symTable;
 		IBTLLexer lexer(inputReader, symTable);
 		if(tokens_only) printTokens(lexer);
-		else if(parse_only) printParse(lexer);
-		else printParse(lexer); // parse by default
+		else if(parse_only) printParse(lexer, filename);
+		else printParse(lexer, filename); // parse by default
 		cout << endl;
 		idx++;
 	}
