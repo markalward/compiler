@@ -5,6 +5,7 @@ PROFTEST =
 # OBJS get built with built-in make rules
 OBJS = lexer/lexer.o lexer/reader.o \
 	parser/newparser.o \
+    generator/generator.o \
 	compiler.o
 
 INCS = -I./include
@@ -31,6 +32,6 @@ stutest.out: compiler
 
 proftest.out: compiler
 	cat $(PROFTEST)
-	./compiler $(RUNFLAGS) $(PROFTEST) > proftest.out
+	-./compiler $(RUNFLAGS) $(PROFTEST) > proftest.out
 	cat proftest.out
 

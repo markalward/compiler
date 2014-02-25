@@ -32,6 +32,26 @@ class VarListNode;
 std::ostream &operator <<(std::ostream &str, Node &node);
 std::ostream &operator <<(std::ostream &str, TokNode &tok);
 
+enum Type {
+    TP_INT,
+    TP_REAL,
+    TP_BOOL,
+    TP_STR
+};
+
+typedef std::ostream    Stream;
+
+struct GenCode
+{
+    std::string code;
+    Type type;
+
+    GenCode(const std::string &code, Type type) :
+        code(code),
+        type(type)
+    {}
+};
+
 class Node
 {
 	friend std::ostream &operator<<(std::ostream &, const Node &);
@@ -111,6 +131,7 @@ protected:
 		ScopeNode()
 	{}
 public:
+
 	virtual ~ExprNode() {}
 };
 
@@ -132,6 +153,8 @@ protected:
 	{}
 public:
 	virtual ~OperNode() {}
+
+    virtual Type generate(Stream &str) = 0;
 };
 
 class TokNode : public OperNode
@@ -147,11 +170,16 @@ public:
 		isToken = true;
 	}
 
+    inline TokenAttr attr() {return token.attr; }
+    inline TokenName type() {return token.name; }
+
 	std::string name() {
 		std::ostringstream str;
 		str << token;
 		return str.str();
 	}
+
+    Type generate(Stream &str);
 
 };
 
@@ -181,6 +209,15 @@ public:
 
 class BinopNode : public OperNode
 {
+    void genReal(Type l, Type r, Stream &str);
+    void genInt(Stream &str);
+    void genBool(Stream &str);
+    void genStr(Stream &str);
+    Type typeCheckBoolOp(Type l, Type r);
+    Type typeCheckCompareOp(Type l, Type r);
+    Type typeCheckNumOp(Type l, Type r);
+    Type typeCheck(Type l, Type r);
+
 public:
 	BinopNode(TokNode *op, OperNode *l, OperNode *r) :
 		OperNode()
@@ -189,6 +226,18 @@ public:
 		children.push_back(l);
 		children.push_back(r);
 	}
+
+    inline TokNode *op() {return (TokNode *) children[0]; }
+    inline OperNode *left() {return (OperNode *) children[1]; }
+    inline OperNode *right() {return (OperNode *) children[2]; }
+
+    inline void typeError(const std::string &msg, Type l, Type r)
+    {
+        // TODO: friendly message
+        throw std::exception();
+    }
+
+    Type generate(Stream &str);
 
 	std::string name() {return std::string("binop"); }
 };
@@ -203,6 +252,8 @@ public:
 		children.push_back(l);
 	}
 
+    Type generate(Stream &str);
+
 	std::string name() {return std::string("unop"); }
 };
 
@@ -216,6 +267,8 @@ public:
 		children.push_back(oper);
 	}
 	
+    Type generate(Stream &str);
+
 	std::string name() {return std::string("assign"); }
 };
 

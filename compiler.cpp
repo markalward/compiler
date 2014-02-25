@@ -62,6 +62,31 @@ void printParse(IBTLLexer &lexer, const string &filename)
 }
 
 
+void printCode(IBTLLexer &lexer, const string &filename)
+{
+    IBTLParser parser(lexer);
+    ProgramNode *p;
+	try {
+		p = parser.parse();
+		cout << "Parse tree for " << filename << ":" << endl;
+		cout << *p << endl;
+	}
+	catch(ParseException &ex) {
+		cout << "parse error: " << ex.what() << endl;
+		exit(EXIT_FAILURE);
+	}
+	catch(LexException &ex) {
+		cout << "lexer error: " << ex.what() << endl;
+		exit(EXIT_FAILURE);
+	}
+
+    cout << "========================================" << endl;
+    ScopeNode *s = dynamic_cast<ScopeNode *>(p->children[0]);
+    OperNode *op = dynamic_cast<OperNode *>(s->children[0]);
+    op->generate(cout);
+}
+
+
 
 
 int main(int argc, char **argv)
@@ -108,7 +133,7 @@ int main(int argc, char **argv)
 		IBTLLexer lexer(inputReader, symTable);
 		if(tokens_only) printTokens(lexer);
 		else if(parse_only) printParse(lexer, filename);
-		else printParse(lexer, filename); // parse by default
+		else printCode(lexer, filename); // parse by default
 		cout << endl;
 		idx++;
 	}
