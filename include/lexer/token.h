@@ -51,6 +51,7 @@ enum TokenAttr {
 	AT_EQ,		
 	AT_NE,
 	AT_PLUS,
+    AT_MINUS,
 	AT_MULT,
 	AT_DIV,
 	AT_EXP,

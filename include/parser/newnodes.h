@@ -162,6 +162,9 @@ class TokNode : public OperNode
 	friend std::ostream &operator <<(std::ostream &str, TokNode &tok);
 	tok token;
 
+    void genBool(Stream &str);
+    void genReal(Stream &str);
+
 public:
 	TokNode(tok token) :
 		OperNode(),
@@ -170,7 +173,13 @@ public:
 		isToken = true;
 	}
 
-    inline TokenAttr attr() {return token.attr; }
+    inline TokenAttr attr() 
+    {
+        // temporary
+        if(token.name == TK_MINUS) return AT_MINUS;
+        return token.attr; 
+    }
+
     inline TokenName type() {return token.name; }
 
 	std::string name() {
@@ -227,9 +236,9 @@ public:
 		children.push_back(r);
 	}
 
-    inline TokNode *op() {return (TokNode *) children[0]; }
-    inline OperNode *left() {return (OperNode *) children[1]; }
-    inline OperNode *right() {return (OperNode *) children[2]; }
+    inline TokNode *op()        {return dynamic_cast<TokNode *>(children[0]); }
+    inline OperNode *left()     {return dynamic_cast<OperNode *>(children[1]); }
+    inline OperNode *right()    {return dynamic_cast<OperNode *>(children[2]); }
 
     inline void typeError(const std::string &msg, Type l, Type r)
     {
@@ -242,8 +251,14 @@ public:
 	std::string name() {return std::string("binop"); }
 };
 
+
 class UnopNode : public OperNode
 {
+    void genReal(Type l, Stream &str);
+    void genInt(Stream &str);
+    void genBool(Stream &str);
+    Type typeCheck(Type l);
+
 public:
 	UnopNode(TokNode *op, OperNode *l) :
 		OperNode()
@@ -251,6 +266,15 @@ public:
 		children.push_back(op);
 		children.push_back(l);
 	}
+    
+    inline TokNode *op()        {return dynamic_cast<TokNode *>(children[0]); }
+    inline OperNode *left()     {return dynamic_cast<OperNode *>(children[1]); }
+
+    inline void typeError(const std::string &msg, Type l)
+    {
+        // TODO: friendly message
+        throw std::exception();
+    }
 
     Type generate(Stream &str);
 

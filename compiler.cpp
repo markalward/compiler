@@ -68,8 +68,6 @@ void printCode(IBTLLexer &lexer, const string &filename)
     ProgramNode *p;
 	try {
 		p = parser.parse();
-		cout << "Parse tree for " << filename << ":" << endl;
-		cout << *p << endl;
 	}
 	catch(ParseException &ex) {
 		cout << "parse error: " << ex.what() << endl;
@@ -80,10 +78,11 @@ void printCode(IBTLLexer &lexer, const string &filename)
 		exit(EXIT_FAILURE);
 	}
 
-    cout << "========================================" << endl;
+    //cout << "========================================" << endl;
     ScopeNode *s = dynamic_cast<ScopeNode *>(p->children[0]);
     OperNode *op = dynamic_cast<OperNode *>(s->children[0]);
     op->generate(cout);
+    cout << " .s f.s";
 }
 
 

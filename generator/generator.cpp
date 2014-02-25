@@ -2,20 +2,24 @@
 #include <parser/newnodes.h>
 #include <assert.h>
 
+/********************************************************
+ BinopNode
+********************************************************/
+
 void BinopNode::genReal(Type l, Type r, Stream &str)
 {
     // if either operand is an int, cast to real
     if(l == TP_INT) {
         assert(r == TP_REAL);
-        str << " 0 d>f fswap";
+        str << " s>d d>f fswap";
     } else if(r == TP_INT) {
         assert(l == TP_REAL);
-        str << " 0 d>f";
+        str << " s>d d>f";
     }
 
     switch(op()->attr()) {
     case AT_PLUS:   str << " f+"; break;
-    //case AT_MINUS:  str << " f-"; break;
+    case AT_MINUS:  str << " f-"; break;
     case AT_MULT:   str << " f*"; break;
     case AT_DIV:    str << " f/"; break;
     case AT_MOD:    str << " fmod"; break;
@@ -34,7 +38,7 @@ void BinopNode::genInt(Stream &str)
 {
     switch(op()->attr()) {
     case AT_PLUS:   str << " +"; break;
-    //case AT_MINUS:  str << " -"; break; // TODO: make MINUS an attr
+    case AT_MINUS:  str << " -"; break; // TODO: make MINUS an attr
     case AT_MULT:   str << " *"; break;
     case AT_DIV:    str << " /"; break;
     case AT_MOD:    str << " mod"; break;
@@ -98,12 +102,14 @@ Type BinopNode::typeCheck(Type l, Type r)
     case AT_PLUS:
         if(l == TP_STR && r == TP_STR) return TP_STR;
         return typeCheckNumOp(l, r);
-    //case AT_MINUS:
+        break;
+    case AT_MINUS:
     case AT_MULT:
     case AT_DIV:
     case AT_MOD:
     case AT_EXP:
-        return typeCheckNumOp(l, r);
+        return typeCheckNumOp(l, r); 
+        break;
     case AT_LT:
     case AT_LE:
     case AT_GT:
@@ -111,9 +117,11 @@ Type BinopNode::typeCheck(Type l, Type r)
     case AT_EQ:
     case AT_NE:
         return typeCheckCompareOp(l, r);
+        break;
     case AT_AND:
     case AT_OR:
         return typeCheckBoolOp(l, r);
+        break;
     default: assert(0); break;
     }
 }
@@ -134,32 +142,129 @@ Type BinopNode::generate(Stream &str)
     return exprType;
 }
 
+/********************************************************
+ UnopNode
+********************************************************/
+
+void UnopNode::genReal(Type l, Stream &str)
+{
+    // cast int to real
+    if(l == TP_INT) {
+        assert(op()->attr() == AT_MINUS);
+        str << " s>d d>f";
+    }
+
+    switch(op()->attr()) {
+    case AT_MINUS:      str << " fnegate"; break;
+    case AT_SIN:        str << " fsin"; break;
+    case AT_COS:        str << " fcos"; break;
+    case AT_TAN:        str << " ftan"; break;
+    default:            assert(0 && "unexpected case"); break;
+    }
+}
+
+void UnopNode::genInt(Stream &str)
+{
+    switch(op()->attr()) {
+    case AT_MINUS:      str << " negate"; break;
+    default:            assert(0 && "unexpected case"); break;  
+    }
+}
+
+void UnopNode::genBool(Stream &str)
+{
+    switch(op()->attr()) {
+    case AT_NOT:        str << " invert"; break;
+    default:            assert(0 && "unexpected case"); break;
+    }
+}
+
+Type UnopNode::typeCheck(Type l)
+{
+    switch(op()->attr()) {
+    case AT_NOT:
+        if(l == TP_BOOL)    return TP_BOOL;
+        typeError("expected bool", l);
+        break;
+    case AT_MINUS:
+        if(l == TP_INT)     return TP_INT;
+        if(l == TP_REAL)    return TP_REAL;
+        typeError("expected number", l);
+    case AT_SIN:
+    case AT_COS:
+    case AT_TAN:
+        if(l == TP_REAL || l == TP_INT) return TP_REAL;
+        typeError("expected number", l);
+    default:
+        assert(0 && "unhandled unary operator in switch case");
+        break;
+    }
+}
 
 Type UnopNode::generate(Stream &str)
 {
-    assert(0 && "unop generate() not implemented");
+    Type l = left()->generate(str);
+    Type exprType = typeCheck(l);
+    switch(exprType) {
+    case TP_BOOL:       genBool(str); break;
+    case TP_INT:        genInt(str); break;
+    case TP_REAL:       genReal(l, str); break;
+    case TP_STR:
+    default:
+        assert(0 && "unexpected case");
+        break;    
+    }
+
+    return exprType;
 }
+
 
 Type AssignNode::generate(Stream &str)
 {
     assert(0 && "assign generate() not implemented");
 }
 
+/********************************************************
+ TokNode
+********************************************************/
+
+void TokNode::genReal(Stream &str)
+{
+    const std::string &val = token.val;
+    str << " " << val;
+    // if the token value does not contain an 'e' or 'E',
+    // append 'e0' to the value
+    if(val.find('e') == std::string::npos &&
+       val.find('E') == std::string::npos)
+        str << "e0";
+}
+
+void TokNode::genBool(Stream &str)
+{
+    switch(token.attr) {
+    case AT_T:      str << " true"; break;
+    case AT_F:      str << " false"; break;
+    default:        assert(0 && "unexpected case"); break;
+    }
+}
+
 Type TokNode::generate(Stream &str)
 {
-    // TODO: temporary
-    str << " " << token.val;
     switch(token.attr) {
     case AT_INT_OCT:
     case AT_INT_HEX:
     case AT_INT_DEC:
+        str << " " << token.val;
         return TP_INT;
     case AT_REAL:
+        genReal(str);
         return TP_REAL;
     case AT_T:
     case AT_F:
+        genBool(str);
         return TP_BOOL;
     case AT_STR:
+        str << " " << token.val;
         return TP_STR;
     default: assert(0 && "unknown literal type"); break;
     }
