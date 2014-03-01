@@ -21,24 +21,20 @@ std::ostream &operator <<(std::ostream &str, Node &node)
 	return str;
 }
 
-std::ostream &operator <<(std::ostream &str, TokNode &tok)
-{
-	return (str << tok.token);
-}
 
 
 // scope (S)
 
 ProgramNode *IBTLParser::T() {
 	discard(TK_OBRAK);
-	ProgramNode *t = new ProgramNode(scopelist());
+	ProgramNode *t = new ProgramNode(scopelist(), line());
 	discard(TK_CBRAK);
 	discard(TK_EOF);
 	return t;
 }
 
 ContainerScopeNode *IBTLParser::scopelist() {
-	return scopelist(new ContainerScopeNode);
+	return scopelist(new ContainerScopeNode(line()));
 }
 
 ContainerScopeNode *IBTLParser::scopelist(ContainerScopeNode *sc) {
@@ -80,8 +76,9 @@ ContainerScopeNode *IBTLParser::scope_p3() {
 }
 
 ScopeNode *IBTLParser::scope_p2() {
+    int ln = line();
 	discard(TK_CBRAK);
-	return new ContainerScopeNode;
+	return new ContainerScopeNode(ln);
 }
 
 ScopeNode *IBTLParser::scope_p1() {
@@ -131,13 +128,13 @@ OperNode *IBTLParser::opersuffix() {
 }
 
 BinopNode *IBTLParser::binop() {
-	BinopNode *t = new BinopNode(take(TK_BINOP), oper(), oper());
+	BinopNode *t = new BinopNode(take(TK_BINOP), oper(), oper(), line());
 	discard(TK_CBRAK);
 	return t;
 }
 
 UnopNode *IBTLParser::unop() {
-	UnopNode *t = new UnopNode(take(TK_UNOP), oper());
+	UnopNode *t = new UnopNode(take(TK_UNOP), oper(), line());
 	discard(TK_CBRAK);
 	return t;
 }
@@ -146,8 +143,8 @@ OperNode *IBTLParser::minus() {
 	TokNode *op = take(TK_MINUS);
 	OperNode *left = oper();
 	OperNode *right = minus_p();
-	if(right) return new BinopNode(op, left, right);
-	else return new UnopNode(op, left);
+	if(right) return new BinopNode(op, left, right, line());
+	else return new UnopNode(op, left, line());
 }
 
 OperNode *IBTLParser::minus_p() {
@@ -176,7 +173,7 @@ TokNode *IBTLParser::id() {
 
 AssignNode *IBTLParser::assign() {
 	discard(TK_ASSIGN);
-	AssignNode *t = new AssignNode(id(), oper());
+	AssignNode *t = new AssignNode(id(), oper(), line());
 	discard(TK_CBRAK);
 	return t;
 }
@@ -193,7 +190,7 @@ StmtNode *IBTLParser::stmtsuffix() {
 
 IfNode *IBTLParser::ifstmts() {
 	discard(TK_IF);
-	IfNode *t = new IfNode(expr(), expr());
+	IfNode *t = new IfNode(line(), expr(), expr());
 	ExprNode *elseStmt = ifstmts_p();	
 	if(elseStmt)
 		t->children.push_back(elseStmt);
@@ -210,7 +207,7 @@ ExprNode *IBTLParser::ifstmts_p() {
 
 WhileNode *IBTLParser::whilestmts() {
 	discard(TK_WHILE);
-	WhileNode *t = new WhileNode(expr(), exprlist());
+	WhileNode *t = new WhileNode(expr(), exprlist(), line());
 	discard(TK_CBRAK);
 	return t;
 }
@@ -218,7 +215,7 @@ WhileNode *IBTLParser::whilestmts() {
 LetNode *IBTLParser::letstmts() {
 	discard(TK_LET);
 	discard(TK_OBRAK);
-	LetNode *t = new LetNode(varlist());
+	LetNode *t = new LetNode(varlist(), line());
 	discard(TK_CBRAK);
 	discard(TK_CBRAK);
 	return t;
@@ -226,7 +223,7 @@ LetNode *IBTLParser::letstmts() {
 
 PrintNode *IBTLParser::printstmts() {
 	discard(TK_PRINT);
-	PrintNode *t = new PrintNode(oper());
+	PrintNode *t = new PrintNode(oper(), line());
 	discard(TK_CBRAK);
 	return t;
 }
@@ -234,7 +231,7 @@ PrintNode *IBTLParser::printstmts() {
 // exprlist & varlist
 
 ExprListNode *IBTLParser::exprlist() {
-	return exprlist(new ExprListNode);
+	return exprlist(new ExprListNode(line()));
 }
 
 ExprListNode *IBTLParser::exprlist(ExprListNode *list) {
@@ -250,7 +247,7 @@ ExprListNode *IBTLParser::exprlist_p(ExprListNode *list) {
 }
 
 VarListNode *IBTLParser::varlist() {
-	return varlist(new VarListNode);
+	return varlist(new VarListNode(line()));
 }
 
 VarListNode *IBTLParser::varlist(VarListNode *list) {
@@ -266,3 +263,4 @@ VarListNode *IBTLParser::varlist_p(VarListNode *list) {
 	if(is(TK_CBRAK))	return list;
 	err("invalid varlist");
 }
+

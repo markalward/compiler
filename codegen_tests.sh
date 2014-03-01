@@ -1,21 +1,29 @@
 #!/bin/bash
 
+cd tests/generator
+
 COMPILER=../../compiler
+TESTLIST=testlist
 FLOAT_DELTA=0.001
 i=0
 while read line
 do
     testfile=$(echo $line | sed 's_^\(.*\),.*$_\1_' )
     exp_result=$(echo $line | sed 's_^.*,\(.*\)$_\1_' )
-    $COMPILER $testfile > deleteme.f
-    result=$(gforth deleteme.f )
 
     echo "test ${i}:"
     echo "==========================================="
     echo "INPUT: "
     cat $testfile
     echo "OUTPUT: "
-    cat deleteme.f
+    $COMPILER -o deleteme.f $testfile
+    returncode=$?
+    if [[ $returncode == 0 ]] ; then
+        result=$(gforth deleteme.f )
+        cat deleteme.f
+    else
+        result="error"
+    fi
     echo
     echo "EXPECTED: $exp_result"
     echo "ACTUAL: $result"
@@ -25,6 +33,7 @@ do
 
     if [[ $exp_result == 'true' && $result == '-1' ||
           $exp_result == 'false' && $result == '0' ||
+          $exp_result == 'error' && $result == 'error' ||
           $result == $exp_result ]] ; then
         echo "PASS"
     elif [[ $exp_result =~ .*\..* ]] ; then
@@ -41,6 +50,6 @@ do
         
     echo
     i=$( expr $i + 1 )
-done < $1
+done < $TESTLIST
 
 

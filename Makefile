@@ -14,8 +14,8 @@ LD = g++
 CXXFLAGS = -std=c++0x $(INCS)
 LDFLAGS = -std=c++0x
 
-# tells compiler to parse only 
-RUNFLAGS = -p
+# output file is called a.out 
+RUNFLAGS = -o a.out
 
 export TESTDIR=./tests/parser/
 
@@ -23,11 +23,11 @@ compiler: $(OBJS)
 	$(LD) $(LDFLAGS) -o compiler $(OBJS) 
 
 clean:
-	rm -f *.o lexer/*.o parser/*.o core *.out
+	rm -f *.o lexer/*.o parser/*.o generator/*.o core *.out
 	ls
 
 stutest.out: compiler
-	@./test.sh 
+	@./codegen_tests.sh
 
 
 proftest.out: compiler

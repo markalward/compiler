@@ -160,6 +160,7 @@ struct Token
 		case AT_EQ: return "=";
 		case AT_NE: return "!=";
 		case AT_PLUS: return "+";
+        case AT_MINUS: return "-";
 		case AT_MULT: return "*";
 		case AT_DIV: return "/";
 		case AT_EXP: return "^";

@@ -1,0 +1,5 @@
+[
+    [if [if true 1]
+        [stdout "hello"]
+    ]
+]

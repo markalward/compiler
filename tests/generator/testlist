@@ -8,3 +8,11 @@ good7.in        , true
 good8.in        , true
 good9.in        , 64
 good10.in       , 22.49
+good_if1.in     , 456
+good_if2.in     , abc
+good_scopes.in  , ab
+bad1.in         , error
+bad2.in         , error
+bad3.in         , error
+bad4.in         , error
+bad5.in         , error

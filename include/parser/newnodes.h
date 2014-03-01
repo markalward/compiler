@@ -8,6 +8,7 @@
 #include <sstream>
 #include <initializer_list>
 #include <lexer/token.h>
+#include <generator/generator.h>
 #include <symtable.h>
 
 typedef Token tok;
@@ -31,7 +32,6 @@ class ExprListNode;
 class VarListNode;
 
 std::ostream &operator <<(std::ostream &str, Node &node);
-std::ostream &operator <<(std::ostream &str, TokNode &tok);
 
 enum Type {
     TP_INT,
@@ -41,18 +41,10 @@ enum Type {
     TP_NONE
 };
 
+std::string typeString(Type tp);
+
 typedef std::ostream    Stream;
 
-struct GenCode
-{
-    std::string code;
-    Type type;
-
-    GenCode(const std::string &code, Type type) :
-        code(code),
-        type(type)
-    {}
-};
 
 class Node
 {
@@ -62,6 +54,7 @@ public:
 	typedef std::vector<Node *> NodeArray;
 	NodeArray children;
 	bool isToken;
+    int mline;
 
 protected:
 	
@@ -70,9 +63,10 @@ protected:
 		isToken(false)
 	{}
 
-	Node(bool isToken = false) :
+	Node(int line, bool isToken = false) :
 		children(),
-		isToken(isToken)
+		isToken(isToken),
+        mline(line)
 	{}
 
 public:
@@ -89,6 +83,15 @@ public:
 		return std::string();
 	}
 
+    void typeError(const std::string &msg)
+    {
+        std::ostringstream str;
+        str << "line " << line() << ": " << msg;
+        throw GenException(str.str());
+    }
+
+    int line() {return mline; }
+
     /*
         generates gforth code for this node. The code is written to
         the output stream 'str' and indented by 'indent' tabs. The
@@ -103,8 +106,8 @@ public:
 class ScopeNode : public Node
 {
 public:
-	ScopeNode() :
-		Node()
+	ScopeNode(int line) :
+		Node(line)
 	{}
 
 	virtual std::string name() {return std::string("scope"); }
@@ -113,8 +116,8 @@ public:
 class ContainerScopeNode : public ScopeNode
 {
 public:
-	ContainerScopeNode() :
-		ScopeNode()
+	ContainerScopeNode(int line) :
+		ScopeNode(line)
 	{}
 
 };
@@ -123,8 +126,8 @@ public:
 class ProgramNode : public Node
 {
 public:
-	ProgramNode(ContainerScopeNode *sc) :
-		Node()
+	ProgramNode(ContainerScopeNode *sc, int line) :
+		Node(line)
 	{
 		children.push_back(sc);
 	}
@@ -143,8 +146,8 @@ public:
 class ExprNode : public ScopeNode
 {
 protected:
-	ExprNode() :
-		ScopeNode()
+	ExprNode(int line) :
+		ScopeNode(line)
 	{}
 public:
 
@@ -154,8 +157,8 @@ public:
 class StmtNode : public ExprNode
 {
 protected:
-	StmtNode() :
-		ExprNode()
+	StmtNode(int line) :
+		ExprNode(line)
 	{}
 public:
 	virtual ~StmtNode() {}
@@ -164,8 +167,8 @@ public:
 class OperNode : public ExprNode
 {
 protected:
-	OperNode() :
-		ExprNode()
+	OperNode(int line) :
+		ExprNode(line)
 	{}
 public:
 	virtual ~OperNode() {}
@@ -181,8 +184,8 @@ class TokNode : public OperNode
     void genReal(Stream &str);
 
 public:
-	TokNode(tok token) :
-		OperNode(),
+	TokNode(tok token, int line) :
+		OperNode(line),
 		token(token)
 	{
 		isToken = true;
@@ -210,8 +213,8 @@ public:
 class ExprListNode : public Node
 {
 public:
-	ExprListNode() :
-		Node()
+	ExprListNode(int line) :
+		Node(line)
 	{}
 
 	std::string name() {return std::string("exprlist"); }
@@ -220,8 +223,8 @@ public:
 class VarListNode : public Node
 {
 public:
-	VarListNode() :
-		Node()
+	VarListNode(int line) :
+		Node(line)
 	{}
 
 	std::string name() {return std::string("varlist"); }
@@ -244,8 +247,8 @@ class BinopNode : public OperNode
     Type typeCheck(Type l, Type r);
 
 public:
-	BinopNode(TokNode *op, OperNode *l, OperNode *r) :
-		OperNode()
+	BinopNode(TokNode *op, OperNode *l, OperNode *r, int line) :
+		OperNode(line)
 	{
 		children.push_back(op);
 		children.push_back(l);
@@ -256,11 +259,15 @@ public:
     inline OperNode *left()     {return dynamic_cast<OperNode *>(children[1]); }
     inline OperNode *right()    {return dynamic_cast<OperNode *>(children[2]); }
 
-    inline void typeError(const std::string &msg, Type l, Type r)
+    inline void binopError(const std::string &msg, Type l, Type r)
     {
-        // TODO: friendly message
-        throw std::exception();
+        std::ostringstream str;
+        str << "line " << line() << ": " << msg << " (have " <<
+            typeString(l) << ", " << typeString(r) << ")";
+        throw GenException(str.str());
     }
+
+    std::string opString() {return Token::attrToString(op()->attr()); }
 
     Type generate(Stream &str, SymbolTable &sym, int indent);
 
@@ -276,8 +283,8 @@ class UnopNode : public OperNode
     Type typeCheck(Type l);
 
 public:
-	UnopNode(TokNode *op, OperNode *l) :
-		OperNode()
+	UnopNode(TokNode *op, OperNode *l, int line) :
+		OperNode(line)
 	{
 		children.push_back(op);
 		children.push_back(l);
@@ -286,11 +293,15 @@ public:
     inline TokNode *op()        {return dynamic_cast<TokNode *>(children[0]); }
     inline OperNode *left()     {return dynamic_cast<OperNode *>(children[1]); }
 
-    inline void typeError(const std::string &msg, Type l)
+    inline void unopError(const std::string &msg, Type l)
     {
-        // TODO: friendly message
-        throw std::exception();
+        std::ostringstream str;
+        str << "line " << line() << ": " << msg << " (have " <<
+            typeString(l) << ")";
+        throw GenException(str.str());
     }
+
+    std::string opString() {return Token::attrToString(op()->attr()); }
 
     Type generate(Stream &str, SymbolTable &sym, int indent);
 
@@ -300,8 +311,8 @@ public:
 class AssignNode : public OperNode
 {
 public:
-	AssignNode(TokNode *name, OperNode *oper) :
-		OperNode()
+	AssignNode(TokNode *name, OperNode *oper, int line) :
+		OperNode(line)
 	{
 		children.push_back(name);
 		children.push_back(oper);
@@ -317,22 +328,24 @@ public:
 class IfNode : public StmtNode
 {
 public:
-	IfNode(ExprNode *condExpr, ExprNode *thenStmt, ExprNode *elseStmt = NULL) :
-		StmtNode()
+	IfNode(int line, ExprNode *condExpr, ExprNode *thenStmt, ExprNode *elseStmt = NULL) :
+		StmtNode(line)
 	{
 		children.push_back(condExpr);
 		children.push_back(thenStmt);
 		if(elseStmt) children.push_back(elseStmt);
 	}
 
-    inline OperNode *cond() {return dynamic_cast<OperNode *>(children[0]); }
-    inline ExprNode *thenStmt() {return dynamic_cast<ExprNode *>(children[1]); }
-    inline ExprNode *elseStmt() {
+    inline ExprNode *condExpr() {return dynamic_cast<ExprNode *>(children[0]); }
+    inline ExprNode *thenExpr() {return dynamic_cast<ExprNode *>(children[1]); }
+    inline ExprNode *elseExpr() {
         if(children.size() == 3)
             return dynamic_cast<ExprNode *>(children[2]);
         else
             return NULL;
      }
+
+    Type generate(Stream &str, SymbolTable &sym, int indent);
 
 	std::string name() {return std::string("if"); }	
 };
@@ -340,8 +353,8 @@ public:
 class WhileNode : public StmtNode
 {
 public:
-	WhileNode(ExprNode *condExpr, ExprListNode *bodyList) :
-		StmtNode()
+	WhileNode(ExprNode *condExpr, ExprListNode *bodyList, int line) :
+		StmtNode(line)
 	{
 		children.push_back(condExpr);
 		children.push_back(bodyList);
@@ -353,8 +366,8 @@ public:
 class LetNode : public StmtNode
 {
 public:
-	LetNode(VarListNode *varlist) :
-		StmtNode()
+	LetNode(VarListNode *varlist, int line) :
+		StmtNode(line)
 	{
 		children.push_back(varlist);
 	}
@@ -365,8 +378,8 @@ public:
 class PrintNode : public StmtNode
 {
 public:
-	PrintNode(OperNode *oper) :
-		StmtNode()
+	PrintNode(OperNode *oper, int line) :
+		StmtNode(line)
 	{
 		children.push_back(oper);
 	}

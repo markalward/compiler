@@ -1,0 +1,9 @@
+[
+    [if false
+        [if true
+            [stdout 123]
+        ]
+
+        [stdout 456]
+    ]
+]

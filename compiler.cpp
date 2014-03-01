@@ -11,7 +11,7 @@ using namespace std;
 extern char *optarg;
 extern int optind, opterr, optopt;
 
-const char *optstr = "tsp";
+const char *optstr = "tspo:";
 const struct option longopts[] = {
 	{"help", 0, NULL, 'h'}
 };
@@ -64,10 +64,16 @@ ProgramNode *parse(IBTLLexer &lexer, bool printTree, const string &filename)
 }
 
 
-void printCode(ProgramNode *p, SymbolTable &sym, const string &filename)
+void printCode(ProgramNode *p, SymbolTable &sym, const string &filename, 
+               std::ostream &file)
 {
-    // TODO: need exception handling
-	p->generate(cout, sym, 0);
+    try {
+	    p->generate(file, sym, 0);
+    }
+    catch(GenException &ex) {
+        cout << std::endl << "code generator error: " << ex.what() << endl;
+        exit(EXIT_FAILURE);
+    }
 }
 
 
@@ -78,7 +84,7 @@ int main(int argc, char **argv)
 	int opt;
 	bool tokens_only = false, parse_only = false, symbols_only = false;
 	string filename;
-	bool use_stdin;
+	string outputname;
 
 	while((opt = getopt_long(argc, argv, optstr, longopts, NULL)) != -1) {
 		switch(opt) {
@@ -94,6 +100,9 @@ int main(int argc, char **argv)
 		case 'p':
 			parse_only = true;
 			break;
+        case 'o':
+            outputname = std::string(optarg);
+            break;
 		case 'h':
 			printf(helpstr, argv[0]);
 			exit(EXIT_SUCCESS);
@@ -102,6 +111,14 @@ int main(int argc, char **argv)
 			break;
 		}
 	}
+
+    if(!outputname.size()) outputname = std::string("a.out");
+    std::ofstream outputfile(outputname);
+    if(!outputfile) {
+        cout << "could not open output file " << outputname << " for writing"
+            << endl;
+        exit(EXIT_FAILURE);
+    }
 
 	// main file processing loop
 	int idx = optind;
@@ -121,7 +138,7 @@ int main(int argc, char **argv)
 		else {
             p = parse(lexer, parse_only, filename);
             if(!parse_only) {
-                printCode(p, symTable, filename);
+                printCode(p, symTable, filename, outputfile);
             }
         }
 		

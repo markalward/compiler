@@ -1,6 +1,21 @@
 
 #include <parser/newnodes.h>
+#include <generator/generator.h>
 #include <assert.h>
+
+std::string typeString(Type tp)
+{
+    switch(tp) {
+    case TP_INT: return "int";
+    case TP_REAL: return "real";
+    case TP_BOOL: return "bool";
+    case TP_STR: return "str";
+    case TP_NONE: return "none";
+    default:
+        return "none";
+    }
+}
+
 
 Type Node::generate(Stream &str, SymbolTable &sym, int indent)
 {
@@ -11,7 +26,9 @@ Type Node::generate(Stream &str, SymbolTable &sym, int indent)
 
 Type ProgramNode::generate(Stream &str, SymbolTable &sym, int indent)
 {
+    std::string tabs(indent, '\t');
     str << ": prog" << std::endl;
+    str << tabs << "\t";
     scope()->generate(str, sym, indent+1);
     str << std::endl << ";" << std::endl;
     str << "prog bye" << std::endl;
@@ -29,7 +46,7 @@ Type PrintNode::generate(Stream &str, SymbolTable &sym, int indent)
     case TP_BOOL:
     case TP_INT:    str << " ."; break;
     case TP_REAL:   str << " f."; break;
-    case TP_STR:    assert(0 && "not implemented"); break;
+    case TP_STR:    str << " type"; break;
     default:        assert(0 && "invalid type in print stmt"); break;  
     }
     return TP_NONE;
@@ -37,18 +54,22 @@ Type PrintNode::generate(Stream &str, SymbolTable &sym, int indent)
 
 Type IfNode::generate(Stream &str, SymbolTable &sym, int indent)
 {
-    std::string ind(indent, '\t');
-    str << ind;
-    cond()->generate(str, sym, indent);
-    str << ind << " if" << std::endl;
+    std::string tabs(indent, '\t');
+    Type t = condExpr()->generate(str, sym, indent);
+    if(t != TP_BOOL)
+        typeError(std::string("expected bool condition in if statement"));
+                  
+    str << " if" << std::endl;
+    str << tabs << "\t";
     thenExpr()->generate(str, sym, indent+1);
     str << std::endl;
     if(elseExpr()) {
-        str << ind << " else" << std::endl;
+        str << tabs << "else" << std::endl;
+        str << tabs << "\t";
         elseExpr()->generate(str, sym, indent+1);
     }
-    
-    str << ind << "end" << std::endl;
+    str << std::endl;
+    str << tabs << "endif" << std::endl;
     return TP_NONE;   
 }
 
@@ -134,14 +155,16 @@ void BinopNode::genStr(Stream &str)
 Type BinopNode::typeCheckBoolOp(Type l, Type r)
 {
     if(l == TP_BOOL && r == TP_BOOL)        return TP_BOOL;
-    typeError("expected bool", l, r);
+    binopError(std::string("expected bool operands to binary ") +
+               opString(), l, r);
 }
 
 Type BinopNode::typeCheckCompareOp(Type l, Type r)
 {
     if((l == TP_REAL || l == TP_INT) &&
        (r == TP_REAL || r == TP_INT))       return TP_BOOL;
-    typeError("expected numbers", l, r);
+    binopError(std::string("expected numeric operands to binary ") +
+              opString(), l, r);
 }
 
 Type BinopNode::typeCheckNumOp(Type l, Type r)
@@ -149,17 +172,20 @@ Type BinopNode::typeCheckNumOp(Type l, Type r)
     if(l == TP_REAL || r == TP_REAL) {
         if((l == TP_REAL || l == TP_INT) &&
            (r == TP_REAL || r == TP_INT))   return TP_REAL;
-        typeError("expected numbers", l, r);
+        binopError(std::string("expected numeric operands to binary ") +
+                   opString(), l, r);
     }
     if(l == TP_INT && r == TP_INT)          return TP_INT;
-    typeError("expected numbers", l, r);
+    binopError(std::string("expected numeric operands to binary ") +
+              opString(), l, r);
 }
 
 Type BinopNode::typeCheckExpOp(Type l, Type r)
 {
     if(l == TP_INT && r == TP_INT)          return TP_INT;
     if(l == TP_REAL && r == TP_INT)         return TP_REAL;
-    typeError("expected number for first arg, int for second arg", l, r); 
+    binopError(std::string("expected numeric left arg and int right arg to binary ") +
+               opString(), l, r); 
 }
 
 Type BinopNode::typeCheck(Type l, Type r)
@@ -218,7 +244,7 @@ void UnopNode::genReal(Type l, Stream &str)
 {
     // cast int to real
     if(l == TP_INT) {
-        str << " s>d d>f";
+        str << " s>f";
     }
 
     switch(op()->attr()) {
@@ -251,17 +277,18 @@ Type UnopNode::typeCheck(Type l)
     switch(op()->attr()) {
     case AT_NOT:
         if(l == TP_BOOL)    return TP_BOOL;
-        typeError("expected bool", l);
+        unopError(std::string("expected bool operand to unary not"), l);
         break;
     case AT_MINUS:
         if(l == TP_INT)     return TP_INT;
         if(l == TP_REAL)    return TP_REAL;
-        typeError("expected number", l);
+        unopError(std::string("expected numeric operand to unary -"), l);
     case AT_SIN:
     case AT_COS:
     case AT_TAN:
         if(l == TP_REAL || l == TP_INT) return TP_REAL;
-        typeError("expected number", l);
+        unopError(std::string("expected numeric operand to unary ") + 
+                  opString(), l);
     default:
         assert(0 && "unhandled unary operator in switch case");
         break;
@@ -331,7 +358,7 @@ Type TokNode::generate(Stream &str, SymbolTable &sym, int indent)
         genBool(str);
         return TP_BOOL;
     case AT_STR:
-        str << " " << token.val;
+        str << " s\" " << token.val.substr(1, std::string::npos);
         return TP_STR;
     default: assert(0 && "unknown literal type"); break;
     }

@@ -92,7 +92,7 @@ class IBTLParser
 	TokNode *take(TokenName expect)
 	{
 		require(expect);
-		TokNode *t = new TokNode(cur);
+		TokNode *t = new TokNode(cur, line());
 		cur = lexer.getToken();
 		return t;
 	}
@@ -106,6 +106,11 @@ class IBTLParser
 		require(expect);
 		cur = lexer.getToken();
 	}
+
+    int line()
+    {
+        return lexer.line();
+    }
 
 	/*
 		return true if current token matches 'name'.
