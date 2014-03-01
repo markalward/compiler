@@ -42,14 +42,16 @@ void printTokens(IBTLLexer &lex)
 }
 
 
-void printParse(IBTLLexer &lexer, const string &filename)
+ProgramNode *parse(IBTLLexer &lexer, bool printTree, const string &filename)
 {
 	IBTLParser parser(lexer);
 	try {
 		ProgramNode *p = parser.parse();
-		cout << "Parse tree for " << filename << ":" << endl;
-		cout << *p << endl;
-		delete p;
+        if(printTree) {
+		    cout << "Parse tree for " << filename << ":" << endl;
+		    cout << *p << endl;
+        }
+		return p;
 	}
 	catch(ParseException &ex) {
 		cout << "parse error: " << ex.what() << endl;
@@ -62,27 +64,10 @@ void printParse(IBTLLexer &lexer, const string &filename)
 }
 
 
-void printCode(IBTLLexer &lexer, const string &filename)
+void printCode(ProgramNode *p, SymbolTable &sym, const string &filename)
 {
-    IBTLParser parser(lexer);
-    ProgramNode *p;
-	try {
-		p = parser.parse();
-	}
-	catch(ParseException &ex) {
-		cout << "parse error: " << ex.what() << endl;
-		exit(EXIT_FAILURE);
-	}
-	catch(LexException &ex) {
-		cout << "lexer error: " << ex.what() << endl;
-		exit(EXIT_FAILURE);
-	}
-
-    //cout << "========================================" << endl;
-    ScopeNode *s = dynamic_cast<ScopeNode *>(p->children[0]);
-    OperNode *op = dynamic_cast<OperNode *>(s->children[0]);
-    op->generate(cout);
-    cout << " .s f.s";
+    // TODO: need exception handling
+	p->generate(cout, sym, 0);
 }
 
 
@@ -130,9 +115,16 @@ int main(int argc, char **argv)
 		Reader inputReader(&in);
 		SymbolTable symTable;
 		IBTLLexer lexer(inputReader, symTable);
+        ProgramNode *p;
+
 		if(tokens_only) printTokens(lexer);
-		else if(parse_only) printParse(lexer, filename);
-		else printCode(lexer, filename); // parse by default
+		else {
+            p = parse(lexer, parse_only, filename);
+            if(!parse_only) {
+                printCode(p, symTable, filename);
+            }
+        }
+		
 		cout << endl;
 		idx++;
 	}

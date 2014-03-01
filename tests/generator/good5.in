@@ -1,0 +1,5 @@
+[
+    [stdout
+        [and [not true] [< 1 2]]
+    ]
+]

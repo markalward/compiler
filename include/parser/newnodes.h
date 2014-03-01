@@ -8,6 +8,7 @@
 #include <sstream>
 #include <initializer_list>
 #include <lexer/token.h>
+#include <symtable.h>
 
 typedef Token tok;
 class Node;
@@ -36,7 +37,8 @@ enum Type {
     TP_INT,
     TP_REAL,
     TP_BOOL,
-    TP_STR
+    TP_STR,
+    TP_NONE
 };
 
 typedef std::ostream    Stream;
@@ -63,7 +65,6 @@ public:
 
 protected:
 	
-
 	Node(NodeArray children) :
 		children(children),
 		isToken(false)
@@ -87,6 +88,14 @@ public:
 	{
 		return std::string();
 	}
+
+    /*
+        generates gforth code for this node. The code is written to
+        the output stream 'str' and indented by 'indent' tabs. The
+        default implementation simply calls generate() on all child
+        nodes and returns TP_NONE.
+    */
+    virtual Type generate(Stream &str, SymbolTable &sym, int indent);
 
 	
 };
@@ -120,7 +129,14 @@ public:
 		children.push_back(sc);
 	}
 
+    inline ContainerScopeNode *scope()
+    {
+        return dynamic_cast<ContainerScopeNode *>(children[0]);
+    }
+
 	std::string name() {return std::string("program"); }
+
+    Type generate(Stream &str, SymbolTable &sym, int indent);
 };
 
 
@@ -154,7 +170,6 @@ protected:
 public:
 	virtual ~OperNode() {}
 
-    virtual Type generate(Stream &str) = 0;
 };
 
 class TokNode : public OperNode
@@ -188,7 +203,7 @@ public:
 		return str.str();
 	}
 
-    Type generate(Stream &str);
+    Type generate(Stream &str, SymbolTable &sym, int indent);
 
 };
 
@@ -220,11 +235,12 @@ class BinopNode : public OperNode
 {
     void genReal(Type l, Type r, Stream &str);
     void genInt(Stream &str);
-    void genBool(Stream &str);
+    void genBool(Type l, Type r, Stream &str);
     void genStr(Stream &str);
     Type typeCheckBoolOp(Type l, Type r);
     Type typeCheckCompareOp(Type l, Type r);
     Type typeCheckNumOp(Type l, Type r);
+    Type typeCheckExpOp(Type l, Type r);
     Type typeCheck(Type l, Type r);
 
 public:
@@ -246,7 +262,7 @@ public:
         throw std::exception();
     }
 
-    Type generate(Stream &str);
+    Type generate(Stream &str, SymbolTable &sym, int indent);
 
 	std::string name() {return std::string("binop"); }
 };
@@ -276,7 +292,7 @@ public:
         throw std::exception();
     }
 
-    Type generate(Stream &str);
+    Type generate(Stream &str, SymbolTable &sym, int indent);
 
 	std::string name() {return std::string("unop"); }
 };
@@ -291,7 +307,7 @@ public:
 		children.push_back(oper);
 	}
 	
-    Type generate(Stream &str);
+    Type generate(Stream &str, SymbolTable &sym, int indent);
 
 	std::string name() {return std::string("assign"); }
 };
@@ -308,6 +324,15 @@ public:
 		children.push_back(thenStmt);
 		if(elseStmt) children.push_back(elseStmt);
 	}
+
+    inline OperNode *cond() {return dynamic_cast<OperNode *>(children[0]); }
+    inline ExprNode *thenStmt() {return dynamic_cast<ExprNode *>(children[1]); }
+    inline ExprNode *elseStmt() {
+        if(children.size() == 3)
+            return dynamic_cast<ExprNode *>(children[2]);
+        else
+            return NULL;
+     }
 
 	std::string name() {return std::string("if"); }	
 };
@@ -345,6 +370,10 @@ public:
 	{
 		children.push_back(oper);
 	}
+
+    inline OperNode *oper() {return dynamic_cast<OperNode *>(children[0]); }
+
+    Type generate(Stream &str, SymbolTable &sym, int indent);
 
 	std::string name() {return std::string("print"); }
 };

@@ -1,0 +1,3 @@
+[[stdout
+    [or [not [not [<= 4. 3.]]] [and true false]]
+]]

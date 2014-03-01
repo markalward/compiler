@@ -2,6 +2,56 @@
 #include <parser/newnodes.h>
 #include <assert.h>
 
+Type Node::generate(Stream &str, SymbolTable &sym, int indent)
+{
+    for(auto iter = children.begin(); iter != children.end(); iter++)
+        (*iter)->generate(str, sym, indent);
+    return TP_NONE;
+}
+
+Type ProgramNode::generate(Stream &str, SymbolTable &sym, int indent)
+{
+    str << ": prog" << std::endl;
+    scope()->generate(str, sym, indent+1);
+    str << std::endl << ";" << std::endl;
+    str << "prog bye" << std::endl;
+    return TP_NONE;
+}
+
+/********************************************************
+ Statements
+********************************************************/
+
+Type PrintNode::generate(Stream &str, SymbolTable &sym, int indent)
+{
+    Type t = oper()->generate(str, sym, indent);
+    switch(t) {
+    case TP_BOOL:
+    case TP_INT:    str << " ."; break;
+    case TP_REAL:   str << " f."; break;
+    case TP_STR:    assert(0 && "not implemented"); break;
+    default:        assert(0 && "invalid type in print stmt"); break;  
+    }
+    return TP_NONE;
+}
+
+Type IfNode::generate(Stream &str, SymbolTable &sym, int indent)
+{
+    std::string ind(indent, '\t');
+    str << ind;
+    cond()->generate(str, sym, indent);
+    str << ind << " if" << std::endl;
+    thenExpr()->generate(str, sym, indent+1);
+    str << std::endl;
+    if(elseExpr()) {
+        str << ind << " else" << std::endl;
+        elseExpr()->generate(str, sym, indent+1);
+    }
+    
+    str << ind << "end" << std::endl;
+    return TP_NONE;   
+}
+
 /********************************************************
  BinopNode
 ********************************************************/
@@ -9,12 +59,15 @@
 void BinopNode::genReal(Type l, Type r, Stream &str)
 {
     // if either operand is an int, cast to real
-    if(l == TP_INT) {
-        assert(r == TP_REAL);
-        str << " s>d d>f fswap";
-    } else if(r == TP_INT) {
-        assert(l == TP_REAL);
-        str << " s>d d>f";
+    // unless operator is exp
+    if(op()->attr() != AT_EXP) {
+        if(l == TP_INT) {
+            assert(r == TP_REAL);
+            str << " s>f fswap";
+        } else if(r == TP_INT) {
+            assert(l == TP_REAL);
+            str << " s>f";
+        }
     }
 
     switch(op()->attr()) {
@@ -23,7 +76,7 @@ void BinopNode::genReal(Type l, Type r, Stream &str)
     case AT_MULT:   str << " f*"; break;
     case AT_DIV:    str << " f/"; break;
     case AT_MOD:    str << " fmod"; break;
-    case AT_EXP:    break; // TODO: how to do exp?
+    case AT_EXP:    str << " 1e0 0 do fover f* loop fnip"; break;
     case AT_LT:     str << " f<"; break;
     case AT_LE:     str << " f<="; break;
     case AT_GT:     str << " f>"; break;
@@ -42,7 +95,7 @@ void BinopNode::genInt(Stream &str)
     case AT_MULT:   str << " *"; break;
     case AT_DIV:    str << " /"; break;
     case AT_MOD:    str << " mod"; break;
-    case AT_EXP:    break; // TODO: how to do exp?
+    case AT_EXP:    str << " 1 swap 0 do over * loop nip"; break;
     case AT_LT:     str << " <"; break;
     case AT_GT:     str << " >"; break;
     case AT_LE:     str << " <="; break;
@@ -53,13 +106,19 @@ void BinopNode::genInt(Stream &str)
     }
 }
 
-void BinopNode::genBool(Stream &str)
+void BinopNode::genBool(Type l, Type r, Stream &str)
 {
     switch(op()->attr()) {
-    case AT_AND:    str << " and"; break;
-    case AT_OR:     str << " or"; break;
-    default:        assert(0); break;
+    case AT_AND:    str << " and"; return;
+    case AT_OR:     str << " or"; return;
+    default: 
+        break;  
     }
+
+    // if we fall down here, we are looking at one of the 
+    // comparison ops
+    if(l == TP_REAL || r == TP_REAL) genReal(l, r, str);
+    else                             genInt(str);
 }
 
 void BinopNode::genStr(Stream &str)
@@ -96,6 +155,13 @@ Type BinopNode::typeCheckNumOp(Type l, Type r)
     typeError("expected numbers", l, r);
 }
 
+Type BinopNode::typeCheckExpOp(Type l, Type r)
+{
+    if(l == TP_INT && r == TP_INT)          return TP_INT;
+    if(l == TP_REAL && r == TP_INT)         return TP_REAL;
+    typeError("expected number for first arg, int for second arg", l, r); 
+}
+
 Type BinopNode::typeCheck(Type l, Type r)
 {
     switch(op()->attr()) {
@@ -107,8 +173,10 @@ Type BinopNode::typeCheck(Type l, Type r)
     case AT_MULT:
     case AT_DIV:
     case AT_MOD:
-    case AT_EXP:
         return typeCheckNumOp(l, r); 
+        break;
+    case AT_EXP:
+        return typeCheckExpOp(l, r);
         break;
     case AT_LT:
     case AT_LE:
@@ -126,13 +194,13 @@ Type BinopNode::typeCheck(Type l, Type r)
     }
 }
 
-Type BinopNode::generate(Stream &str)
+Type BinopNode::generate(Stream &str, SymbolTable &sym, int indent)
 {
-    Type l = left()->generate(str);
-    Type r = right()->generate(str);
+    Type l = left()->generate(str, sym, indent);
+    Type r = right()->generate(str, sym, indent);
     Type exprType = typeCheck(l, r);
     switch(exprType) {
-    case TP_BOOL:       genBool(str); break;
+    case TP_BOOL:       genBool(l, r, str); break;
     case TP_REAL:       genReal(l, r, str); break;
     case TP_INT:        genInt(str); break;
     case TP_STR:        genStr(str); break;
@@ -150,7 +218,6 @@ void UnopNode::genReal(Type l, Stream &str)
 {
     // cast int to real
     if(l == TP_INT) {
-        assert(op()->attr() == AT_MINUS);
         str << " s>d d>f";
     }
 
@@ -201,9 +268,9 @@ Type UnopNode::typeCheck(Type l)
     }
 }
 
-Type UnopNode::generate(Stream &str)
+Type UnopNode::generate(Stream &str, SymbolTable &sym, int indent)
 {
-    Type l = left()->generate(str);
+    Type l = left()->generate(str, sym, indent);
     Type exprType = typeCheck(l);
     switch(exprType) {
     case TP_BOOL:       genBool(str); break;
@@ -219,7 +286,7 @@ Type UnopNode::generate(Stream &str)
 }
 
 
-Type AssignNode::generate(Stream &str)
+Type AssignNode::generate(Stream &str, SymbolTable &sym, int indent)
 {
     assert(0 && "assign generate() not implemented");
 }
@@ -248,7 +315,7 @@ void TokNode::genBool(Stream &str)
     }
 }
 
-Type TokNode::generate(Stream &str)
+Type TokNode::generate(Stream &str, SymbolTable &sym, int indent)
 {
     switch(token.attr) {
     case AT_INT_OCT:
