@@ -33,18 +33,11 @@ class VarListNode;
 
 std::ostream &operator <<(std::ostream &str, Node &node);
 
-enum Type {
-    TP_INT,
-    TP_REAL,
-    TP_BOOL,
-    TP_STR,
-    TP_NONE
-};
-
 std::string typeString(Type tp);
 
-typedef std::ostream    Stream;
+Type tokenToType(TokenName name, TokenAttr attr);
 
+typedef std::ostream    Stream;
 
 class Node
 {
@@ -69,6 +62,7 @@ protected:
         mline(line)
 	{}
 
+    
 public:
 	virtual ~Node()
 	{
@@ -83,15 +77,18 @@ public:
 		return std::string();
 	}
 
-    void typeError(const std::string &msg)
+    void error(const std::string &msg)
     {
         std::ostringstream str;
         str << "line " << line() << ": " << msg;
         throw GenException(str.str());
     }
 
-    int line() {return mline; }
+    void typeError(const std::string &msg) {error(msg); }
+    
 
+    int line() {return mline; }
+    
     /*
         generates gforth code for this node. The code is written to
         the output stream 'str' and indented by 'indent' tabs. The
@@ -99,7 +96,6 @@ public:
         nodes and returns TP_NONE.
     */
     virtual Type generate(Stream &str, SymbolTable &sym, int indent);
-
 	
 };
 
@@ -119,6 +115,8 @@ public:
 	ContainerScopeNode(int line) :
 		ScopeNode(line)
 	{}
+
+    Type generate(Stream &str, SymbolTable &sym, int indent);
 
 };
 
@@ -182,6 +180,7 @@ class TokNode : public OperNode
 
     void genBool(Stream &str);
     void genReal(Stream &str);
+    Type genVariable(Stream &str, SymbolTable &sym);
 
 public:
 	TokNode(tok token, int line) :
@@ -199,6 +198,8 @@ public:
     }
 
     inline TokenName type() {return token.name; }
+
+    inline std::string &val() {return token.val; }
 
 	std::string name() {
 		std::ostringstream str;
@@ -226,6 +227,19 @@ public:
 	VarListNode(int line) :
 		Node(line)
 	{}
+
+    int varCount() {return children.size() / 2; }
+    
+    std::pair<std::string, Type> item(int i)
+    {
+        i = i * 2;
+        TokNode *id = dynamic_cast<TokNode *>(children[i]);
+        TokNode *type = dynamic_cast<TokNode *>(children[i+1]);
+        return std::pair<std::string, Type>(
+            id->val(),
+            tokenToType(type->type(), type->attr())
+            );
+    }
 
 	std::string name() {return std::string("varlist"); }
 };
@@ -310,14 +324,20 @@ public:
 
 class AssignNode : public OperNode
 {
+
+    Type typeCheck(Type ltype, Type rtype);
+
 public:
-	AssignNode(TokNode *name, OperNode *oper, int line) :
+	AssignNode(TokNode *id, OperNode *oper, int line) :
 		OperNode(line)
 	{
-		children.push_back(name);
+		children.push_back(id);
 		children.push_back(oper);
 	}
 	
+    inline TokNode *id() {return dynamic_cast<TokNode *>(children[0]); }
+    inline OperNode *oper() {return dynamic_cast<OperNode *>(children[1]); }
+
     Type generate(Stream &str, SymbolTable &sym, int indent);
 
 	std::string name() {return std::string("assign"); }
@@ -360,17 +380,28 @@ public:
 		children.push_back(bodyList);
 	}
 
+    inline ExprNode *condExpr() {return dynamic_cast<ExprNode *>(children[0]); }
+    inline ExprListNode *bodyList() {return dynamic_cast<ExprListNode *>(children[1]); }
+
+    Type generate(Stream &str, SymbolTable &sym, int indent);
+
 	std::string name() {return std::string("while"); }
 };
 
 class LetNode : public StmtNode
 {
+    void genVar(Stream &str, const std::string &varname, Type type);
+
 public:
 	LetNode(VarListNode *varlist, int line) :
 		StmtNode(line)
 	{
 		children.push_back(varlist);
 	}
+
+    inline VarListNode *varlist() {return dynamic_cast<VarListNode *>(children[0]); }
+
+    Type generate(Stream &str, SymbolTable &sym, int indent);
 
 	std::string name() {return std::string("let"); }
 };

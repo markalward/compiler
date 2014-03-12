@@ -16,11 +16,28 @@ std::string typeString(Type tp)
     }
 }
 
+Type tokenToType(TokenName name, TokenAttr attr)
+{
+    if(name != TK_TYPE) return TP_NONE;
+    switch(attr) {
+    case AT_KBOOL: return TP_BOOL;
+    case AT_KINT: return TP_INT;
+    case AT_KREAL: return TP_REAL;
+    case AT_KSTR: return TP_STR;
+    default: return TP_NONE;
+    }
+}
+
 
 Type Node::generate(Stream &str, SymbolTable &sym, int indent)
 {
-    for(auto iter = children.begin(); iter != children.end(); iter++)
-        (*iter)->generate(str, sym, indent);
+    std::string tabs(indent, '\t');
+    for(auto iter = children.begin(); iter != children.end(); iter++) {
+        (*iter)->generate(str, sym, indent+1);
+        if(iter != children.end()-1) str << std::endl;
+        str << tabs << "\t";
+    }
+
     return TP_NONE;
 }
 
@@ -35,9 +52,60 @@ Type ProgramNode::generate(Stream &str, SymbolTable &sym, int indent)
     return TP_NONE;
 }
 
+Type ContainerScopeNode::generate(Stream &str, SymbolTable &sym, int indent)
+{
+    std::string tabs(indent, '\t');
+    sym.enterScope();
+    str << " scope" << std::endl;
+    // the default generate() method does everything we need here
+    str << tabs << "\t";
+    Node::generate(str, sym, indent);
+    str << std::endl;
+    str << tabs << "endscope";
+    sym.exitScope();
+    return TP_NONE;
+}
+
 /********************************************************
  Statements
 ********************************************************/
+
+void LetNode::genVar(Stream &str, const std::string &varname, Type type)
+{
+    switch(type) {
+    case TP_INT:        str << " 0 { W: " << varname << " }"; break;
+    case TP_REAL:       str << " 0e0 { F: " << varname << " }"; break;
+    case TP_BOOL:       str << " false { W: " << varname << " }"; break;
+    case TP_STR:        str << " s\" \" { D: " << varname << " }"; break; // TODO: doubleword notation?
+    default:            assert(0 && "unexpected case");
+    }
+}
+
+Type LetNode::generate(Stream &str, SymbolTable &sym, int indent)
+{
+    // every variable name has the depth of its containing scope 
+    // appended to it. This ensures that there are no variables 
+    // with the same name in enclosing scopes
+    std::ostringstream varsuffix;
+    varsuffix << "_" << sym.scopeDepth();
+
+    int count = varlist()->varCount();
+    for(int i = 0; i < count; i++) {
+        auto decl = varlist()->item(i);
+        std::string varname = decl.first + varsuffix.str();
+
+        // try to add to the symbol table, if it already exists at
+        // current scope throw an exception
+        bool ok = sym.declare(decl.first, varname, decl.second);
+        if(!ok)
+            error(std::string("variable ") + decl.first + 
+                  std::string(" redefined in same scope"));
+
+        genVar(str, varname, decl.second);
+    }
+
+    return TP_NONE;
+}
 
 Type PrintNode::generate(Stream &str, SymbolTable &sym, int indent)
 {
@@ -55,11 +123,12 @@ Type PrintNode::generate(Stream &str, SymbolTable &sym, int indent)
 Type IfNode::generate(Stream &str, SymbolTable &sym, int indent)
 {
     std::string tabs(indent, '\t');
+    sym.enterScope();
     Type t = condExpr()->generate(str, sym, indent);
     if(t != TP_BOOL)
         typeError(std::string("expected bool condition in if statement"));
                   
-    str << " if" << std::endl;
+    str << " scope if" << std::endl;
     str << tabs << "\t";
     thenExpr()->generate(str, sym, indent+1);
     str << std::endl;
@@ -67,10 +136,81 @@ Type IfNode::generate(Stream &str, SymbolTable &sym, int indent)
         str << tabs << "else" << std::endl;
         str << tabs << "\t";
         elseExpr()->generate(str, sym, indent+1);
+        str << std::endl;
     }
-    str << std::endl;
-    str << tabs << "endif" << std::endl;
+    
+    str << tabs << "endif endscope";
+    sym.exitScope();
     return TP_NONE;   
+}
+
+Type WhileNode::generate(Stream &str, SymbolTable &sym, int indent)
+{
+    std::string tabs(indent, '\t');
+    // if and while statements are scopes
+    sym.enterScope();
+
+    str << " scope begin" << std::endl;
+    str << tabs << "\t";
+    Type t = condExpr()->generate(str, sym, indent);
+    if(t != TP_BOOL)
+        typeError(std::string("expected bool condition in while loop"));
+    str << std::endl;
+    str << tabs << "while" << std::endl;
+    str << tabs << "\t";
+    bodyList()->generate(str, sym, indent);
+    str << std::endl;
+    str << tabs << "repeat endscope";
+    sym.exitScope();
+    return TP_NONE;
+}
+
+/********************************************************
+ AssignNode
+********************************************************/
+
+Type AssignNode::typeCheck(Type ltype, Type rtype)
+{
+    if(ltype == TP_REAL) {
+        if(rtype == TP_REAL || rtype == TP_INT ) return TP_REAL;
+        typeError("expected numeric rvalue");
+    }
+    if(ltype == TP_INT) {
+        if(rtype == TP_INT) return TP_INT;
+        typeError("expected int rvalue");
+    }
+    if(ltype == TP_BOOL) {
+        if(rtype == TP_BOOL) return TP_BOOL;
+        typeError("expected bool rvalue");
+    }
+    if(ltype == TP_STR) {
+        if(rtype == TP_STR) return TP_STR;
+        typeError("expected str rvalue");
+    }
+    assert(0 && "we should not be here");
+}
+
+Type AssignNode::generate(Stream &str, SymbolTable &sym, int indent)
+{
+    // find the identifier in the symbol table
+    SymbolData dat;
+    bool ok = sym.find(id()->val(), dat);
+    if(!ok)
+        error(std::string("undeclared variable ") + id()->val());
+
+    Type ltype = dat.type;
+    Type rtype = oper()->generate(str, sym, indent);
+
+    // verify that left and right types are compatible
+    Type outtype = typeCheck(ltype, rtype);
+
+    // cast int rvalue to float if necessary
+    if(outtype == TP_REAL && rtype == TP_INT)
+        str << " s>f";
+ 
+    str << " TO " << dat.outputName;
+    str << " " << dat.outputName;
+    return outtype;
 }
 
 /********************************************************
@@ -313,11 +453,6 @@ Type UnopNode::generate(Stream &str, SymbolTable &sym, int indent)
 }
 
 
-Type AssignNode::generate(Stream &str, SymbolTable &sym, int indent)
-{
-    assert(0 && "assign generate() not implemented");
-}
-
 /********************************************************
  TokNode
 ********************************************************/
@@ -342,8 +477,22 @@ void TokNode::genBool(Stream &str)
     }
 }
 
+Type TokNode::genVariable(Stream &str, SymbolTable &sym)
+{
+    // find the identifier in the symbol table
+    SymbolData dat;
+    bool ok = sym.find(val(), dat);
+    if(!ok)
+        error(std::string("undeclared variable ") + val());
+
+    str << " " << dat.outputName;
+    return dat.type;
+}
+
 Type TokNode::generate(Stream &str, SymbolTable &sym, int indent)
 {
+    if(token.name == TK_ID) return genVariable(str, sym);
+
     switch(token.attr) {
     case AT_INT_OCT:
     case AT_INT_HEX:
