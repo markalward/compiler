@@ -73,7 +73,7 @@ Token IBTLLexer::readString()
 	char c;
 	while(true) {
 		c = input.getChar();
-		if(c == EOF)
+		if(c == 0)
 			throw LexException("missing end \"", input);
 		else if(c == '\"')
 			break;

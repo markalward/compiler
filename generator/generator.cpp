@@ -28,6 +28,46 @@ Type tokenToType(TokenName name, TokenAttr attr)
     }
 }
 
+void genVar(Stream &str, const std::string &varname, Type type, bool init)
+{
+    if(init)
+        switch(type) {
+        case TP_INT:        str << " 0 { W: " << varname << " }"; break;
+        case TP_REAL:       str << " 0e0 { F: " << varname << " }"; break;
+        case TP_BOOL:       str << " false { W: " << varname << " }"; break;
+        case TP_STR:        str << " s\" \" { D: " << varname << " }"; break; // TODO: doubleword notation?
+        default:            assert(0 && "unexpected case");
+        }
+    else
+        switch(type) {
+        case TP_INT:        str << " { W: " << varname << " }"; break;
+        case TP_REAL:       str << " { F: " << varname << " }"; break;
+        case TP_BOOL:       str << " { W: " << varname << " }"; break;
+        case TP_STR:        str << " { D: " << varname << " }"; break; // TODO: doubleword notation?
+        default:            assert(0 && "unexpected case");
+    }
+}
+
+bool generateVarDec(const std::string &id, Type type, 
+                    Stream &str, SymbolTable &sym, int indent, bool init)
+{
+    // every variable name has the depth of its containing scope 
+    // appended to it. This ensures that there are no variables 
+    // with the same name in enclosing scopes
+    std::ostringstream varsuffix;
+    varsuffix << "_" << sym.scopeDepth();
+
+    std::string varname = id + varsuffix.str();
+
+    // try to add to the symbol table, if it already exists at
+    // current scope throw an exception
+    bool ok = sym.declare(id, varname, type);
+    if(!ok) return false;
+
+    genVar(str, varname, type, init);
+    return true;
+}
+
 
 Type Node::generate(Stream &str, SymbolTable &sym, int indent)
 {
@@ -44,11 +84,16 @@ Type Node::generate(Stream &str, SymbolTable &sym, int indent)
 Type ProgramNode::generate(Stream &str, SymbolTable &sym, int indent)
 {
     std::string tabs(indent, '\t');
+#ifdef ENABLE_FUNCTIONS
+    scope()->generate(str, sym, indent);
+    str << std::endl << "bye" << std::endl;
+#else
     str << ": prog" << std::endl;
     str << tabs << "\t";
     scope()->generate(str, sym, indent+1);
     str << std::endl << ";" << std::endl;
     str << "prog bye" << std::endl;
+#endif
     return TP_NONE;
 }
 
@@ -56,12 +101,31 @@ Type ContainerScopeNode::generate(Stream &str, SymbolTable &sym, int indent)
 {
     std::string tabs(indent, '\t');
     sym.enterScope();
+
+#ifdef ENABLE_FUNCTIONS
+    // scopes can only be created in functions
+    if(sym.context() == CTX_INSIDE_FUNC) {
+        
+        str << " scope" << std::endl;
+        // the default generate() method does everything we need here
+        str << tabs << "\t";
+        Node::generate(str, sym, indent);
+        str << std::endl;
+        str << tabs << "endscope";
+    }
+    else {
+        str << tabs << "\t";
+        Node::generate(str, sym, indent);
+    }
+#else
+    // scopes can be created anywhere
     str << " scope" << std::endl;
-    // the default generate() method does everything we need here
     str << tabs << "\t";
     Node::generate(str, sym, indent);
     str << std::endl;
     str << tabs << "endscope";
+#endif
+
     sym.exitScope();
     return TP_NONE;
 }
@@ -70,38 +134,23 @@ Type ContainerScopeNode::generate(Stream &str, SymbolTable &sym, int indent)
  Statements
 ********************************************************/
 
-void LetNode::genVar(Stream &str, const std::string &varname, Type type)
-{
-    switch(type) {
-    case TP_INT:        str << " 0 { W: " << varname << " }"; break;
-    case TP_REAL:       str << " 0e0 { F: " << varname << " }"; break;
-    case TP_BOOL:       str << " false { W: " << varname << " }"; break;
-    case TP_STR:        str << " s\" \" { D: " << varname << " }"; break; // TODO: doubleword notation?
-    default:            assert(0 && "unexpected case");
-    }
-}
+
 
 Type LetNode::generate(Stream &str, SymbolTable &sym, int indent)
 {
-    // every variable name has the depth of its containing scope 
-    // appended to it. This ensures that there are no variables 
-    // with the same name in enclosing scopes
-    std::ostringstream varsuffix;
-    varsuffix << "_" << sym.scopeDepth();
-
+#ifdef ENABLE_FUNCTIONS
+    if(sym.context() == CTX_OUTSIDE_FUNC)
+        error("let statements cannot be used outside functions");
+#endif
     int count = varlist()->varCount();
     for(int i = 0; i < count; i++) {
         auto decl = varlist()->item(i);
-        std::string varname = decl.first + varsuffix.str();
-
-        // try to add to the symbol table, if it already exists at
-        // current scope throw an exception
-        bool ok = sym.declare(decl.first, varname, decl.second);
+        
+        bool ok = generateVarDec(decl.first, decl.second,
+                                 str, sym, indent, true);
         if(!ok)
             error(std::string("variable ") + decl.first + 
                   std::string(" redefined in same scope"));
-
-        genVar(str, varname, decl.second);
     }
 
     return TP_NONE;
@@ -122,6 +171,11 @@ Type PrintNode::generate(Stream &str, SymbolTable &sym, int indent)
 
 Type IfNode::generate(Stream &str, SymbolTable &sym, int indent)
 {
+    #ifdef ENABLE_FUNCTIONS
+        if(sym.context() == CTX_OUTSIDE_FUNC)
+            error("if statements only allowed in functions");
+    #endif
+
     std::string tabs(indent, '\t');
     sym.enterScope();
     Type t = condExpr()->generate(str, sym, indent);
@@ -146,6 +200,11 @@ Type IfNode::generate(Stream &str, SymbolTable &sym, int indent)
 
 Type WhileNode::generate(Stream &str, SymbolTable &sym, int indent)
 {
+    #ifdef ENABLE_FUNCTIONS
+        if(sym.context() == CTX_OUTSIDE_FUNC)
+            error("while statements only allowed in functions");
+    #endif
+
     std::string tabs(indent, '\t');
     // if and while statements are scopes
     sym.enterScope();
@@ -163,6 +222,66 @@ Type WhileNode::generate(Stream &str, SymbolTable &sym, int indent)
     str << tabs << "repeat endscope";
     sym.exitScope();
     return TP_NONE;
+}
+
+Type FunctionNode::generate(Stream &str, SymbolTable &sym, int indent)
+{
+    #ifdef ENABLE_FUNCTIONS
+    if(sym.context() == CTX_INSIDE_FUNC)
+        error("nested functions not allowed");
+    sym.setContext(CTX_INSIDE_FUNC);
+
+    std::string tabs(indent, '\t');
+    std::ostringstream funcName;
+    int idCount = idlist()->count();
+    int typeCount = typelist()->count();
+    if(idCount != typeCount || idCount == 0)
+        error("id list and type list in function declaration must be same size");
+    funcName << idlist()->item(0);
+    std::string returnVar = idlist()->item(0);    
+    Type returnType = typelist()->item(0);
+    
+    // add function name to symbol table
+    std::vector<Type> paramTypes;
+    for(int i = 1; i < typeCount; i++)
+        paramTypes.push_back(typelist()->item(i));
+    bool ok = sym.declareFunction(idlist()->item(0), funcName.str(), 
+                                  returnType, paramTypes);
+    if(!ok)
+        error("function redefined in current scope");
+
+    sym.enterScope();
+    str << " : " << funcName.str() << std::endl;
+    str << tabs << "\t";
+    // generate param list
+    for(int i = 1; i < idCount; i++) {
+        ok = generateVarDec(idlist()->item(i), typelist()->item(i),
+                                 str, sym, indent, false);
+        if(!ok)
+            error(std::string("redefined function parameter ") + idlist()->item(i));
+    }
+    // generate return variable
+    ok = generateVarDec(returnVar, returnType,
+                        str, sym, indent, true);
+    if(!ok)
+        error(std::string("return variable has same name as function parameter "));
+    str << std::endl;
+    str << tabs << "\t";
+    // generate body
+    body()->generate(str, sym, indent+1);
+    str << std::endl;
+    str << tabs << "\t";
+    // put return value on stack
+    // HACK
+    idlist()->children[0]->generate(str, sym, indent);
+    str << std::endl << tabs << ";" << std::endl;
+
+    sym.exitScope();
+    sym.setContext(CTX_OUTSIDE_FUNC);
+    return returnType;
+    #else
+    return TP_NONE;
+    #endif
 }
 
 /********************************************************
@@ -452,6 +571,40 @@ Type UnopNode::generate(Stream &str, SymbolTable &sym, int indent)
     return exprType;
 }
 
+/********************************************************
+ CallNode
+******************************************************/
+
+void CallNode::typeCheck(SymbolData &dat, int paramIndex, Type paramType)
+{
+   if(paramType != dat.paramType[paramIndex]) {
+        std::ostringstream str;
+        str << "arg #" << paramIndex+1 << " has type " << typeString(paramType) <<
+            " but function expects " << typeString(dat.paramType[paramIndex]);
+        typeError(str.str());
+   }
+}
+
+Type CallNode::generate(Stream &str, SymbolTable &sym, int indent)
+{
+    // find the function in the symbol table
+    SymbolData dat;
+    bool ok = sym.find(funcId()->val(), dat);
+    if(!ok)
+        error(std::string("undeclared function ") + funcId()->val());
+    if(dat.paramCount != paramCount())
+        error("wrong number of args to function");
+
+    // push params onto stack in reverse order
+    for(int i = paramCount() - 1; i >= 0; i--) {
+        Type paramType = param(i)->generate(str, sym, indent);
+        typeCheck(dat, i, paramType);
+    }
+
+    // call function
+    str << " " << dat.outputName;
+    return dat.type;
+}
 
 /********************************************************
  TokNode

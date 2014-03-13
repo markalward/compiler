@@ -244,6 +244,37 @@ public:
 	std::string name() {return std::string("varlist"); }
 };
 
+class IdListNode : public Node
+{
+public:
+	IdListNode(int line) :
+		Node(line)
+	{}
+
+    int count() {return children.size(); }
+    std::string item(int i) {
+        return (dynamic_cast<TokNode *>(children[i]))->val();
+    }
+
+	std::string name() {return std::string("idlist"); }
+};
+
+class TypeListNode : public Node
+{
+public:
+	TypeListNode(int line) :
+		Node(line)
+	{}
+
+    int count() {return children.size(); }
+    Type item(int i) {
+        TokNode *t = dynamic_cast<TokNode *>(children[i]);
+        return tokenToType(t->type(), t->attr());
+    }
+
+	std::string name() {return std::string("typelist"); }
+};
+
 
 
 // opers
@@ -343,6 +374,28 @@ public:
 	std::string name() {return std::string("assign"); }
 };
 
+class CallNode : public OperNode
+{
+
+    void typeCheck(SymbolData &dat, int paramIndex, Type paramType);
+
+public:
+	CallNode(int line) :
+		OperNode(line)
+	{}
+	
+    inline TokNode *funcId() {return dynamic_cast<TokNode *>(children[0]); }
+    int paramCount() {return children.size()-1; }
+    inline OperNode *param(int i) {return dynamic_cast<OperNode *>(children[i+1]); }
+
+    Type generate(Stream &str, SymbolTable &sym, int indent);
+
+	std::string name() {return std::string("call"); }
+};
+
+
+
+
 // statements
 
 class IfNode : public StmtNode
@@ -404,6 +457,23 @@ public:
     Type generate(Stream &str, SymbolTable &sym, int indent);
 
 	std::string name() {return std::string("let"); }
+};
+
+class FunctionNode : public StmtNode
+{
+
+public:
+    FunctionNode(int line) :
+        StmtNode(line)
+    {}
+
+    inline IdListNode *idlist() {return dynamic_cast<IdListNode *>(children[0]); }
+    inline TypeListNode *typelist() {return dynamic_cast<TypeListNode *>(children[1]); }
+    inline ContainerScopeNode *body() {return dynamic_cast<ContainerScopeNode *>(children[2]); }
+    
+    Type generate(Stream &str, SymbolTable &sym, int indent);
+
+    std::string name() {return std::string("function"); }
 };
 
 class PrintNode : public StmtNode

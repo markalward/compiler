@@ -11,7 +11,7 @@ OBJS = lexer/lexer.o lexer/reader.o \
 INCS = -I./include
 
 LD = g++
-CXXFLAGS = -std=c++0x $(INCS)
+CXXFLAGS = -std=c++0x $(INCS) -DENABLE_FUNCTIONS
 LDFLAGS = -std=c++0x
 
 # output file is called a.out 

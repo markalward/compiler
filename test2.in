@@ -1,0 +1,7 @@
+[
+    [let [[f s ][ int string]]
+        [stdout s]    
+    ]
+
+    [f "hello world"]
+]

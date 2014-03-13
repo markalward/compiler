@@ -1,7 +1,11 @@
 [
-    [let [[n int][a real][b real][area real]]]
+    [let [[a b c][int int int]]
+       []  
+    ]
+
+    [let [[n int][a float][b float][area float]]]
     
-    [let [[width real][x real]]]
+    [let [[width float][x float]]]
 
     [:= n 100]
     [:= a 0] [:= b 1] [:= area 0]

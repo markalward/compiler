@@ -16,6 +16,11 @@ enum Type {
     TP_NONE
 };
 
+enum Context {
+    CTX_OUTSIDE_FUNC,
+    CTX_INSIDE_FUNC,
+};
+
 struct SymbolData;
 class SymbolTable;
 
@@ -31,6 +36,10 @@ struct SymbolData
     // the type of the identifier  
     // TODO: make defn of Type visible  
     Type type;
+
+    // for functions: parameter count & types
+    std::vector<Type> paramType;
+    int paramCount;
 
     SymbolData(TokenName name, TokenAttr attr, const std::string &outputName, 
                Type type) :
@@ -56,6 +65,7 @@ typedef std::unordered_map<std::string, SymbolData> ScopeTable;
 class SymbolTable
 {
 	std::vector<ScopeTable> table;
+    Context ctx;
 
     // returns the global scope, which is always at the bottom of the 
 	// stack
@@ -63,7 +73,8 @@ class SymbolTable
 
 public:
 	SymbolTable() :
-		table()
+		table(),
+        ctx(CTX_OUTSIDE_FUNC)
 	{
 		// add outermost (global) scope to table
 		table.push_back(ScopeTable());
@@ -78,8 +89,9 @@ public:
 
 		glob["bool"] = SymbolData(TK_TYPE, AT_KBOOL);
 		glob["int"] = SymbolData(TK_TYPE, AT_KINT);
-		glob["real"] = SymbolData(TK_TYPE, AT_KREAL);
-		glob["str"] = SymbolData(TK_TYPE, AT_KSTR);
+        // TODO: verify these are correct type names
+		glob["float"] = SymbolData(TK_TYPE, AT_KREAL);
+		glob["string"] = SymbolData(TK_TYPE, AT_KSTR);
 
 		glob["true"] = SymbolData(TK_CONSTANT, AT_T);
 		glob["false"] = SymbolData(TK_CONSTANT, AT_F);
@@ -95,6 +107,9 @@ public:
 	inline void enterScope() {table.push_back(ScopeTable()); }
 	inline void exitScope() {table.pop_back(); }
     inline int scopeDepth() {return table.size(); }
+    
+    inline Context context() {return ctx; }
+    inline void setContext(Context c) {ctx = c; }
 
     /* 
        declares the identifier 'id' in the current scope with type 
@@ -111,6 +126,22 @@ public:
         }
         else
             return false;
+    }
+
+    bool declareFunction(const std::string &id, const std::string &outputName,
+                         Type returnType, std::vector<Type> &parms)
+    {
+        ScopeTable &local = table.back();
+        if(local.find(id) == local.end()) {
+            SymbolData dat = SymbolData(TK_ID, AT_NONE, outputName, 
+                                        returnType); 
+            dat.paramCount = parms.size();
+            dat.paramType = parms;
+            local[id] = dat;
+            return true;
+        }
+        else
+            return false; 
     }
 
     /*

@@ -57,6 +57,7 @@ class IBTLParser
 	OperNode *minus_p();
 	OperNode *minus_p1();
 	OperNode *minus_p2();
+    CallNode *call();
 	TokNode *constant();
 	TokNode *id();
 	AssignNode *assign();
@@ -64,7 +65,9 @@ class IBTLParser
 	IfNode *ifstmts();
 	ExprNode *ifstmts_p();
 	WhileNode *whilestmts();
-	LetNode *letstmts();
+	StmtNode *letstmts();
+    StmtNode *letstmts_p(TokNode *firstId);
+    FunctionNode *funcstmts(TokNode *firstId);
 	PrintNode *printstmts();
 	ExprListNode *exprlist();
 	ExprListNode *exprlist(ExprListNode *list);
@@ -72,7 +75,12 @@ class IBTLParser
 	VarListNode *varlist();
 	VarListNode *varlist(VarListNode *list);
 	VarListNode *varlist_p(VarListNode *list);
-	
+	IdListNode *idlist(IdListNode *list);
+    IdListNode *idlist_p(IdListNode *list);
+    TypeListNode *typelist();
+    TypeListNode *typelist(TypeListNode *list);
+    TypeListNode *typelist_p(TypeListNode *list);
+
 	void err(const char *msg)
 	{
 		throw ParseException(msg, lexer.line());

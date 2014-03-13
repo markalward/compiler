@@ -63,8 +63,8 @@ ScopeNode *IBTLParser::scope1() {
 }
 
 ScopeNode *IBTLParser::scope_p() {
-	if(is(TK_OBRAK) || is(TK_CONSTANT) || is(TK_ID))
-		return scope_p3();		
+	if(is(TK_OBRAK) || is(TK_CONSTANT))
+		return scope_p3();
 	if(is(TK_CBRAK))	return scope_p2();
 	return scope_p1();
 }
@@ -98,7 +98,8 @@ ExprNode *IBTLParser::expr() {
 }
 
 ExprNode *IBTLParser::exprsuffix() {
-	if(is(TK_BINOP) || is(TK_UNOP) || is(TK_MINUS) || is(TK_ASSIGN))
+	if(is(TK_BINOP) || is(TK_UNOP) || is(TK_MINUS) || is(TK_ASSIGN) ||
+       is(TK_ID))
 		return opersuffix();
 	if(is(TK_LET) || is(TK_PRINT) || is(TK_IF) || is(TK_WHILE))
 		return stmtsuffix();
@@ -124,6 +125,7 @@ OperNode *IBTLParser::opersuffix() {
 	if(is(TK_UNOP))		return unop();
 	if(is(TK_MINUS))	return minus();
 	if(is(TK_ASSIGN))	return assign();
+    if(is(TK_ID))       return call();
 	err("invalid oper");
 }
 
@@ -161,6 +163,15 @@ OperNode *IBTLParser::minus_p1() {
 OperNode *IBTLParser::minus_p2() {
 	discard(TK_CBRAK);
 	return NULL;
+}
+
+CallNode *IBTLParser::call() {
+    CallNode *t = new CallNode(line());
+    t->children.push_back(take(TK_ID));
+    while(!is(TK_CBRAK))
+        t->children.push_back(oper());
+    discard(TK_CBRAK);
+    return t;
 }
 
 TokNode *IBTLParser::constant() {
@@ -212,13 +223,44 @@ WhileNode *IBTLParser::whilestmts() {
 	return t;
 }
 
-LetNode *IBTLParser::letstmts() {
+StmtNode *IBTLParser::letstmts() {
 	discard(TK_LET);
 	discard(TK_OBRAK);
-	LetNode *t = new LetNode(varlist(), line());
-	discard(TK_CBRAK);
-	discard(TK_CBRAK);
-	return t;
+    discard(TK_OBRAK);
+    TokNode *firstId = take(TK_ID);
+    return letstmts_p(firstId);
+}
+
+StmtNode *IBTLParser::letstmts_p(TokNode *firstId) {
+    if(is(TK_TYPE)) {
+        // regular let statements
+        VarListNode *vars = new VarListNode(line());
+        vars->children.push_back(firstId);
+        vars->children.push_back(take(TK_TYPE));
+        discard(TK_CBRAK);
+        LetNode *t = new LetNode(varlist(vars), line());
+        discard(TK_CBRAK);
+        discard(TK_CBRAK);
+        return t;
+    }
+    // functions
+    if(is(TK_ID)) return funcstmts(firstId);
+    err("expected id or type in let statement");
+}
+
+FunctionNode *IBTLParser::funcstmts(TokNode *firstId) {
+    FunctionNode *t = new FunctionNode(line());
+    IdListNode *ids = new IdListNode(line());
+    ids->children.push_back(firstId);
+    t->children.push_back(idlist(ids));
+    discard(TK_CBRAK);
+    discard(TK_OBRAK);
+    t->children.push_back(typelist());
+    discard(TK_CBRAK);
+    discard(TK_CBRAK);
+    t->children.push_back(scopelist());
+    discard(TK_CBRAK);
+    return t;
 }
 
 PrintNode *IBTLParser::printstmts() {
@@ -228,7 +270,7 @@ PrintNode *IBTLParser::printstmts() {
 	return t;
 }
 
-// exprlist & varlist
+// exprlist, operlist, idlist, typelist & varlist
 
 ExprListNode *IBTLParser::exprlist() {
 	return exprlist(new ExprListNode(line()));
@@ -251,16 +293,45 @@ VarListNode *IBTLParser::varlist() {
 }
 
 VarListNode *IBTLParser::varlist(VarListNode *list) {
+    if(is(TK_OBRAK))    return varlist_p(list);
+    if(is(TK_CBRAK))    return list;
+    err("invalid varlist");	
+}
+
+VarListNode *IBTLParser::varlist_p(VarListNode *list) {
 	discard(TK_OBRAK);
 	list->children.push_back(take(TK_ID));
 	list->children.push_back(take(TK_TYPE));
 	discard(TK_CBRAK);
-	return varlist_p(list);
+    return varlist(list);
 }
 
-VarListNode *IBTLParser::varlist_p(VarListNode *list) {
-	if(is(TK_OBRAK))	return varlist(list);
-	if(is(TK_CBRAK))	return list;
-	err("invalid varlist");
+IdListNode *IBTLParser::idlist(IdListNode *list) {
+    if(is(TK_ID))       return idlist_p(list);
+    if(is(TK_CBRAK))    return list;
+    err("invalid idlist");
+
+    
 }
+
+IdListNode *IBTLParser::idlist_p(IdListNode *list) {
+    list->children.push_back(take(TK_ID));
+    return idlist(list);
+}
+
+TypeListNode *IBTLParser::typelist() {
+    return typelist(new TypeListNode(line()));
+}
+
+TypeListNode *IBTLParser::typelist(TypeListNode *list) {
+    list->children.push_back(take(TK_TYPE));
+    return typelist_p(list);
+}
+
+TypeListNode *IBTLParser::typelist_p(TypeListNode *list) {
+    if(is(TK_TYPE))     return typelist(list);
+    if(is(TK_CBRAK))    return list;
+    err("invalid typelist");
+}
+
 

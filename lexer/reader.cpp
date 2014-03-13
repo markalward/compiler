@@ -26,7 +26,9 @@ char Reader::getChar()
 	}
 		
 	if(c == '\n') line++;
-	readbuf[pos++] = c;
+
+    if(pos >= BUFSIZE) c = 0;
+	else readbuf[pos++] = c;
 	return c;
 }
 
