@@ -1,0 +1,12 @@
+[
+    [let [[i int]]]
+    [:= i 0]
+    [while [<= i 8]
+        [if [= [% i 2] 0]
+            [stdout 1]
+            [stdout 0]
+        ]
+        
+        [:= i [+ i 1]]
+    ]
+]

@@ -5,6 +5,7 @@
 #include <getopt.h>
 #include <iostream>
 #include <fstream>
+#include <cstdio>
 
 using namespace std;
 
@@ -65,13 +66,14 @@ ProgramNode *parse(IBTLLexer &lexer, bool printTree, const string &filename)
 
 
 void printCode(ProgramNode *p, SymbolTable &sym, const string &filename, 
-               std::ostream &file)
+               const string &outputname, std::ostream &file)
 {
     try {
 	    p->generate(file, sym, 0);
     }
     catch(GenException &ex) {
         cout << std::endl << "code generator error: " << ex.what() << endl;
+        remove(outputname.c_str());
         exit(EXIT_FAILURE);
     }
 }
@@ -138,7 +140,7 @@ int main(int argc, char **argv)
 		else {
             p = parse(lexer, parse_only, filename);
             if(!parse_only) {
-                printCode(p, symTable, filename, outputfile);
+                printCode(p, symTable, filename, outputname, outputfile);
             }
         }
 		

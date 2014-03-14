@@ -1,8 +1,12 @@
 [
+    [let [[i int]]]
+    [:= i 1]
+    [while [<= i 10]
+        [let [[j int]]]
 
-    [let [[inc a][int int]]
-        [:= f [+ a 1]]
+        [stdout j]
+
+        [:= j [+ j 1]]
+        [:= i [+ i 1]]
     ]
-
-    [stdout [inc 5]]
 ]

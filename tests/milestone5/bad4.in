@@ -1,0 +1,7 @@
+
+[[if [> 2 3] [stdout "yes"]]
+[if [> 2 3] [stdout "yes"] [stdout "no"]]
+[[let [[x int]]] [:= x 10] [stdout [- 20 x]]]
+[while [> x 5] [stdout "hello"] [:= x [- x 1]]] ]
+
+

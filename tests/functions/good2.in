@@ -1,0 +1,7 @@
+[
+    [let [[inc x][int int]]
+        [:= inc [+ x 1]]
+    ]
+
+    [stdout [inc [+ 1 1]]]
+]

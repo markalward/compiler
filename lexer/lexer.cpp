@@ -144,6 +144,7 @@ Token IBTLLexer::readNumber(char c)
 			else if(isoct(c)) state = q1_9;
 			else if(std::isdigit(c)) state = q1;
 			else if(c == '.') state = q2;
+            else if(c == 'e' || c == 'E') state = q5;
 			else state = acceptDec;
 			break;
 		case q1_9:
@@ -151,12 +152,14 @@ Token IBTLLexer::readNumber(char c)
 			if(isoct(c)) state = q1_9;
 			else if(std::isdigit(c)) state = q1;
 			else if(c == '.') state = q2;
+            else if(c == 'e' || c == 'E') state = q5;
 			else state = acceptOct;
 			break;
 		case q1_12:
 			c = input.getChar();
 			if(std::isdigit(c)) state = q1_12;
 			else if(c == '.') state = q2;
+            else if(c == 'e' || c == 'E') state = q5;
 			else state = acceptDec;
 			break;
 		case q10:
