@@ -1,0 +1,7 @@
+[
+    [let [[a bool]]]
+    [if a
+        [stdout "yes"]
+        [stdout "no"]
+    ]
+]

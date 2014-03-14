@@ -1,7 +1,7 @@
 [
 
     [let [[inc a][int int]]
-        [:= inc [+ a 1]]
+        [:= f [+ a 1]]
     ]
 
     [stdout [inc 5]]

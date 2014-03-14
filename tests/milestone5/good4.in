@@ -1,0 +1,8 @@
+[
+    [let [[i int]]]
+    [:= i 10]
+    [while [>= i 0]
+        [stdout i]
+        [:= i [- i 1]]
+    ]
+]

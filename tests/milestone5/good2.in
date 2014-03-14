@@ -1,0 +1,13 @@
+[
+    [
+        [let [[a int]]]
+        [:= a 5]
+        [stdout a]
+    ]
+
+    [
+        [let [[a int]]]
+        [:= a 10]
+        [stdout a]
+    ]
+]

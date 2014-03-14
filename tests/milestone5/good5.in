@@ -1,0 +1,5 @@
+[
+    [while false
+        [stdout "here"]
+    ]
+]

@@ -1,0 +1,7 @@
+[
+    [let [[a float][b int]]]
+    
+    [:= b [-500]]
+    [:= a b]
+    [stdout a]
+]
